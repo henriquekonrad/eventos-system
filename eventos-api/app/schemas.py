@@ -2,6 +2,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
+from uuid import UUID
 
 # ---------- Usuarios ----------
 class UsuarioCreate(BaseModel):
@@ -11,7 +12,7 @@ class UsuarioCreate(BaseModel):
     cpf: Optional[str] = None
 
 class UsuarioOut(BaseModel):
-    id: str
+    id: UUID
     nome: str
     email: EmailStr
     cpf: Optional[str] = None
@@ -31,7 +32,7 @@ class EventoCreate(BaseModel):
     fim_em: Optional[datetime] = None
 
 class EventoOut(BaseModel):
-    id: str
+    id: UUID
     titulo: str
     descricao: Optional[str] = None
     inicio_em: Optional[datetime] = None
@@ -42,15 +43,15 @@ class EventoOut(BaseModel):
 
 # ---------- Inscricao ----------
 class InscricaoCreateRapida(BaseModel):
-    evento_id: str
+    evento_id: UUID
     nome_rapido: str
     cpf_rapido: Optional[str] = None
     email_rapido: Optional[EmailStr] = None
 
 class InscricaoOut(BaseModel):
-    id: str
-    evento_id: str
-    usuario_id: Optional[str] = None
+    id: UUID
+    evento_id: UUID
+    usuario_id: Optional[UUID] = None
     inscricao_rapida: Optional[bool] = None
     nome_rapido: Optional[str] = None
     cpf_rapido: Optional[str] = None
@@ -64,15 +65,15 @@ class InscricaoOut(BaseModel):
 
 # ---------- Checkin ----------
 class CheckinCreate(BaseModel):
-    inscricao_id: str
-    ingresso_id: str
-    usuario_id: str  # pela model esse campo é non-null
+    inscricao_id: UUID
+    ingresso_id: UUID
+    usuario_id: UUID
 
 class CheckinOut(BaseModel):
-    id: str
-    inscricao_id: str
-    ingresso_id: str
-    usuario_id: str
+    id: UUID
+    inscricao_id: UUID
+    ingresso_id: UUID
+    usuario_id: UUID
     ocorrido_em: Optional[datetime]
 
     class Config:
@@ -80,13 +81,13 @@ class CheckinOut(BaseModel):
 
 # ---------- Certificado ----------
 class CertificadoCreate(BaseModel):
-    inscricao_id: str
-    evento_id: str
+    inscricao_id: UUID
+    evento_id: UUID
 
 class CertificadoOut(BaseModel):
-    id: str
-    inscricao_id: str
-    evento_id: str
+    id: UUID
+    inscricao_id: UUID
+    evento_id: UUID
     codigo_certificado: str
     emitido_em: Optional[datetime]
     caminho_pdf: Optional[str]
