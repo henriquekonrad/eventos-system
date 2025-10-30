@@ -10,6 +10,7 @@ router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str):
+    password = password.strip()
     return pwd_context.hash(password)
 
 @router.post("/", response_model=schemas.UsuarioOut, status_code=status.HTTP_201_CREATED)
