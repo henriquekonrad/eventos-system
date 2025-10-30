@@ -13,5 +13,5 @@ class Inscricao(Base):
     cpf_rapido = Column(String(20))
     email_rapido = Column(String(255))
     status = Column(String(50), default="confirmada")  # ou "cancelada"
-    cancelado_em = Column(DateTime, default=datetime.datetime.utcnow)
+    cancelado_em = Column(DateTime, nullable=True, default=None)
     sincronizado = Column(Boolean)
