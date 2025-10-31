@@ -59,7 +59,7 @@ def checkin_rapido(evento_id: str, nome: str, cpf: str = None, email: str = None
         nome_rapido=nome,
         cpf_rapido=cpf,
         email_rapido=email,
-        status="confirmada",
+        status="ativa",
         sincronizado=False
     )
     db.add(inscr)
