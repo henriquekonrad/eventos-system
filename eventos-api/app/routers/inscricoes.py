@@ -34,7 +34,7 @@ def criar_inscricao_normal(evento_id: UUID, usuario_id: UUID, db: Session = Depe
         evento_id=evento_id,
         usuario_id=usuario_id,
         inscricao_rapida=False,
-        status="confirmada",
+        status="ativa",
         sincronizado=False
     )
     db.add(inscr)
