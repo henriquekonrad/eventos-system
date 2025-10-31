@@ -4,6 +4,7 @@ from app.core.database import get_db
 from app.models.ingresso import Ingresso
 from app.models.inscricao import Inscricao
 from app.models.evento import Evento
+from app.schemas import IngressoSchema
 from uuid import UUID, uuid4
 import datetime
 import hashlib
@@ -19,13 +20,13 @@ def to_uuid(id_str: str):
         raise HTTPException(status_code=400, detail="ID inválido")
 
 
-@router.get("/evento/{evento_id}", response_model=List[dict])
+@router.get("/evento/{evento_id}", response_model=List[IngressoSchema])
 def listar_ingressos_por_evento(evento_id: str, db: Session = Depends(get_db)):
     eid = to_uuid(evento_id)
     ingressos = db.query(Ingresso).filter(Ingresso.evento_id == eid).all()
     if not ingressos:
         raise HTTPException(status_code=404, detail="Nenhum ingresso encontrado para este evento")
-    return [ing.__dict__ for ing in ingressos]
+    return ingressos
 
 
 @router.post("/inscricao/{inscricao_id}", status_code=status.HTTP_201_CREATED)

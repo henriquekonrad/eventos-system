@@ -94,3 +94,16 @@ class CertificadoOut(BaseModel):
 
     class Config:
         orm_mode = True
+
+# ------------ Ingresso --------------
+class IngressoSchema(BaseModel):
+    id: UUID
+    inscricao_id: UUID
+    evento_id: UUID
+    codigo_ingresso: str
+    token_qr: str
+    status: str
+    emitido_em: datetime
+
+    class Config:
+        orm_mode = True
