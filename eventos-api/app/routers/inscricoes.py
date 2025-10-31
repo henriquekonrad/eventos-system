@@ -78,7 +78,7 @@ def criar_inscricao_rapida(payload: schemas.InscricaoCreateRapida, db: Session =
         nome_rapido=payload.nome_rapido,
         cpf_rapido=payload.cpf_rapido,
         email_rapido=payload.email_rapido,
-        status="atvia",
+        status="ativa",
         sincronizado=False
     )
     db.add(inscr)
