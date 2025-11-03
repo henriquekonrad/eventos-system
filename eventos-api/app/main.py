@@ -35,13 +35,13 @@ async def db_session_middleware(request: Request, call_next):
 async def auditoria(request: Request, call_next):
     return await auditoria_middleware(request, call_next)
 
-app.include_router(auth.router)
-app.include_router(usuarios.router)
-app.include_router(eventos.router)
-app.include_router(inscricoes.router)
-app.include_router(checkins.router)
-app.include_router(certificados.router)
-app.include_router(ingressos.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(usuarios.router, prefix="/api")
+app.include_router(eventos.router, prefix="/api")
+app.include_router(inscricoes.router, prefix="/api")
+app.include_router(checkins.router, prefix="/api")
+app.include_router(certificados.router, prefix="/api")
+app.include_router(ingressos.router, prefix="/api")
 
 @app.get("/ping")
 def ping():
