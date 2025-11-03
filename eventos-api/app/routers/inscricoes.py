@@ -8,7 +8,7 @@ from app import schemas
 from uuid import UUID, uuid4
 from secrets import token_urlsafe
 import datetime
-from app.core.security import require_roles
+from app.core.security import require_api_key, require_roles
 from app.routers.auth import get_current_user
 
 router = APIRouter(prefix="/inscricoes", tags=["Inscricoes"])
@@ -19,7 +19,8 @@ def criar_inscricao_normal(
     evento_id: UUID,
     usuario_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador", "atendente"))
+    current_user: Usuario = Depends(require_roles("administrador", "atendente")),
+    api_key: None = Depends(require_api_key)
 ):
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
@@ -54,7 +55,8 @@ def criar_inscricao_normal(
 def criar_inscricao_rapida(
     payload: schemas.InscricaoCreateRapida,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador", "atendente"))
+    current_user: Usuario = Depends(require_roles("administrador", "atendente")),
+    api_key: None = Depends(require_api_key)
 ):
     evento = db.query(Evento).filter(Evento.id == payload.evento_id).first()
     if not evento:
@@ -116,7 +118,8 @@ def obter_inscricao(inscricao_id: UUID, db: Session = Depends(get_db)):
 def cancelar_inscricao(
     inscricao_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador", "atendente"))
+    current_user: Usuario = Depends(require_roles("administrador", "atendente")),
+    api_key: None = Depends(require_api_key)
 ):
     inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscr:

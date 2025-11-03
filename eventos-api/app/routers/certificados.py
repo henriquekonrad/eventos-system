@@ -10,6 +10,7 @@ import secrets
 import datetime
 from app.core.security import require_roles
 from app.routers.auth import get_current_user
+from app.core.security import require_api_key
 
 router = APIRouter(prefix="/certificados", tags=["Certificados"])
 
@@ -19,7 +20,8 @@ router = APIRouter(prefix="/certificados", tags=["Certificados"])
 def emitir_certificado(
     payload: schemas.CertificadoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("atendente", "administrador"))
+    current_user: Usuario = Depends(require_roles("atendente", "administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     inscr = db.query(Inscricao).filter(
         Inscricao.id == payload.inscricao_id,
@@ -64,7 +66,8 @@ def obter_por_codigo(codigo: str, db: Session = Depends(get_db)):
 @router.get("/meus", response_model=list[schemas.CertificadoOut])
 def listar_meus_certificados(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
+    api_key: None = Depends(require_api_key)
 ):
     certs = (
         db.query(Certificado)
@@ -78,7 +81,8 @@ def listar_meus_certificados(
 def revogar_certificado(
     codigo: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("atendente", "administrador"))
+    current_user: Usuario = Depends(require_roles("atendente", "administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     c = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
     if not c:

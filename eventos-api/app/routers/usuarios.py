@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app import schemas
 from passlib.context import CryptContext
 from uuid import UUID
-from app.core.security import require_roles
+from app.core.security import require_api_key, require_roles
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -19,7 +19,8 @@ def hash_password(password: str):
 def criar_usuario(
     u: schemas.UsuarioCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador"))
+    current_user: Usuario = Depends(require_roles("administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     if db.query(Usuario).filter(Usuario.email == u.email).first():
         raise HTTPException(status_code=400, detail="Email já cadastrado")
@@ -43,7 +44,8 @@ def criar_usuario(
 @router.get("/", response_model=list[schemas.UsuarioOut])
 def listar_usuarios(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador"))
+    current_user: Usuario = Depends(require_roles("administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     return db.query(Usuario).all()
 

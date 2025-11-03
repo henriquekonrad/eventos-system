@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import datetime
 import hashlib
 from typing import List
-from app.core.security import require_roles
+from app.core.security import require_api_key, require_roles
 from app.routers.auth import get_current_user
 from app.models.usuario import Usuario
 
@@ -28,7 +28,8 @@ def listar_ingressos_por_evento(evento_id: UUID, db: Session = Depends(get_db)):
 def criar_ingresso(
     inscricao_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador", "atendente"))
+    current_user: Usuario = Depends(require_roles("administrador", "atendente")),
+    api_key: None = Depends(require_api_key)
 ):
     inscricao = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscricao:
@@ -77,7 +78,8 @@ def validar_ingresso(token_qr: str, db: Session = Depends(get_db)):
 def marcar_ingresso_usado(
     ingresso_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador", "atendente"))
+    current_user: Usuario = Depends(require_roles("administrador", "atendente")),
+    api_key: None = Depends(require_api_key)
 ):
     ingresso = db.query(Ingresso).filter(Ingresso.id == ingresso_id).first()
     if not ingresso:

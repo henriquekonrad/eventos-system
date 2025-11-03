@@ -9,7 +9,7 @@ from app import schemas
 import uuid
 from uuid import UUID
 import datetime
-from app.core.security import require_roles
+from app.core.security import require_api_key, require_roles
 from app.routers.auth import get_current_user
 from passlib.context import CryptContext
 import secrets
@@ -18,12 +18,6 @@ router = APIRouter(prefix="/checkins", tags=["Checkins"])
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def to_uuid(id_str: str):
-    try:
-        return UUID(id_str)
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
-
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def registrar_checkin(
@@ -31,7 +25,8 @@ def registrar_checkin(
     ingresso_id: UUID,
     usuario_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("atendente", "administrador"))
+    current_user: Usuario = Depends(require_roles("atendente", "administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     """
     Registra check-in para uma inscrição existente.
@@ -75,7 +70,8 @@ def checkin_rapido(
     email: str,
     ingresso_id: UUID | None = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("atendente", "administrador"))
+    current_user: Usuario = Depends(require_roles("atendente", "administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     """
     Cria inscrição rápida, usuário rápido (caso não exista) e registra check-in.

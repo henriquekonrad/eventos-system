@@ -4,7 +4,7 @@ from app.core.database import get_db
 from app.models.evento import Evento
 from app import schemas
 from uuid import UUID
-from app.core.security import require_roles
+from app.core.security import require_api_key, require_roles
 from app.routers.auth import get_current_user
 from app.models.usuario import Usuario
 
@@ -14,7 +14,8 @@ router = APIRouter(prefix="/eventos", tags=["Eventos"])
 def criar_evento(
     payload: schemas.EventoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador"))
+    current_user: Usuario = Depends(require_roles("administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     evento = Evento(
         titulo=payload.titulo,
@@ -43,7 +44,8 @@ def atualizar_evento(
     evento_id: UUID,
     payload: schemas.EventoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador"))
+    current_user: Usuario = Depends(require_roles("administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     e = db.query(Evento).filter(Evento.id == evento_id).first()
     if not e:
@@ -61,7 +63,8 @@ def atualizar_evento(
 def remover_evento(
     evento_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("administrador"))
+    current_user: Usuario = Depends(require_roles("administrador")),
+    api_key: None = Depends(require_api_key)
 ):
     e = db.query(Evento).filter(Evento.id == evento_id).first()
     if not e:
