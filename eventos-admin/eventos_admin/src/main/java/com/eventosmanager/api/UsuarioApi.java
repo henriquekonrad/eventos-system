@@ -1,13 +1,16 @@
 package com.eventosmanager.api;
 
-import com.eventosmanager.config.AppConfig;
-import com.eventosmanager.models.Usuario;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import okhttp3.*;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+
+import com.eventosmanager.config.AppConfig;
+import com.eventosmanager.models.Usuario;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class UsuarioApi {
     private static final String BASE_URL = AppConfig.get("API_BASE_URL");

@@ -1,16 +1,16 @@
 package com.eventosmanager;
 
-import com.eventosmanager.api.UsuarioApi;
-import com.eventosmanager.models.Usuario;
-
 import java.io.IOException;
 import java.util.List;
+
+import com.eventosmanager.api.EventoApi;
+import com.eventosmanager.models.Evento;
 
 public class Main {
     public static void main(String[] args) {
         try {
-            List<Usuario> usuarios = UsuarioApi.listarUsuarios();
-            usuarios.forEach(u -> System.out.println(u.nome + " | " + u.email));
+            List<Evento> usuarios = EventoApi.listarEventos();
+            usuarios.forEach(u -> System.out.println(u.getTitulo() + " | " + u.getDescricao()));
         } catch (IOException e) {
             e.printStackTrace();
         }
