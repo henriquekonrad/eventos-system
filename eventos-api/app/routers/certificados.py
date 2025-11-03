@@ -4,15 +4,23 @@ from app.core.database import get_db
 from app.models.certificado import Certificado
 from app.models.inscricao import Inscricao
 from app.models.checkin import Checkin
+from app.models.usuario import Usuario
 from app import schemas
 import secrets
 import datetime
+from app.core.security import require_roles
+from app.routers.auth import get_current_user
 
 router = APIRouter(prefix="/certificados", tags=["Certificados"])
 
-
-@router.post("/emitir", response_model=schemas.CertificadoOut, status_code=status.HTTP_201_CREATED)
-def emitir_certificado(payload: schemas.CertificadoCreate, db: Session = Depends(get_db)):
+@router.post("/emitir",
+    response_model=schemas.CertificadoOut,
+    status_code=status.HTTP_201_CREATED)
+def emitir_certificado(
+    payload: schemas.CertificadoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("atendente", "administrador"))
+):
     inscr = db.query(Inscricao).filter(
         Inscricao.id == payload.inscricao_id,
         Inscricao.evento_id == payload.evento_id
@@ -41,25 +49,37 @@ def emitir_certificado(payload: schemas.CertificadoCreate, db: Session = Depends
 
 @router.get("/{codigo}", response_model=schemas.CertificadoOut)
 def obter_por_codigo(codigo: str, db: Session = Depends(get_db)):
+    """
+    Endpoint público para validação de certificados.
+    Permite verificar autenticidade sem login.
+    """
     c = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
     if not c:
         raise HTTPException(status_code=404, detail="Certificado não encontrado")
+    if c.revogado:
+        raise HTTPException(status_code=400, detail="Certificado revogado/inválido")
     return c
 
 
-@router.get("/usuario/{usuario_id}", response_model=list[schemas.CertificadoOut])
-def listar_por_usuario(usuario_id: str, db: Session = Depends(get_db)):
+@router.get("/meus", response_model=list[schemas.CertificadoOut])
+def listar_meus_certificados(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
     certs = (
         db.query(Certificado)
         .join(Inscricao, Inscricao.id == Certificado.inscricao_id)
-        .filter(Inscricao.usuario_id == usuario_id)
+        .filter(Inscricao.usuario_id == current_user.id)
         .all()
     )
     return certs
 
-
 @router.post("/revogar/{codigo}")
-def revogar_certificado(codigo: str, db: Session = Depends(get_db)):
+def revogar_certificado(
+    codigo: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("atendente", "administrador"))
+):
     c = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
     if not c:
         raise HTTPException(status_code=404, detail="Certificado não encontrado")

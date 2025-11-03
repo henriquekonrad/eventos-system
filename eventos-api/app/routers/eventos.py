@@ -4,18 +4,18 @@ from app.core.database import get_db
 from app.models.evento import Evento
 from app import schemas
 from uuid import UUID
-import uuid
+from app.core.security import require_roles
+from app.routers.auth import get_current_user
+from app.models.usuario import Usuario
 
 router = APIRouter(prefix="/eventos", tags=["Eventos"])
 
-def to_uuid(id_str: str):
-    try:
-        return UUID(id_str)
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
-
 @router.post("/", response_model=schemas.EventoOut, status_code=status.HTTP_201_CREATED)
-def criar_evento(payload: schemas.EventoCreate, db: Session = Depends(get_db)):
+def criar_evento(
+    payload: schemas.EventoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("administrador"))
+):
     evento = Evento(
         titulo=payload.titulo,
         descricao=payload.descricao,
@@ -32,17 +32,20 @@ def listar_eventos(db: Session = Depends(get_db)):
     return db.query(Evento).order_by(Evento.inicio_em).all()
 
 @router.get("/{evento_id}", response_model=schemas.EventoOut)
-def obter_evento(evento_id: str, db: Session = Depends(get_db)):
-    eid = to_uuid(evento_id)
-    e = db.query(Evento).filter(Evento.id == eid).first()
+def obter_evento(evento_id: UUID, db: Session = Depends(get_db)):
+    e = db.query(Evento).filter(Evento.id == evento_id).first()
     if not e:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     return e
 
 @router.put("/{evento_id}", response_model=schemas.EventoOut)
-def atualizar_evento(evento_id: str, payload: schemas.EventoCreate, db: Session = Depends(get_db)):
-    eid = to_uuid(evento_id)
-    e = db.query(Evento).filter(Evento.id == eid).first()
+def atualizar_evento(
+    evento_id: UUID,
+    payload: schemas.EventoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("administrador"))
+):
+    e = db.query(Evento).filter(Evento.id == evento_id).first()
     if not e:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     e.titulo = payload.titulo
@@ -55,9 +58,12 @@ def atualizar_evento(evento_id: str, payload: schemas.EventoCreate, db: Session 
     return e
 
 @router.delete("/{evento_id}")
-def remover_evento(evento_id: str, db: Session = Depends(get_db)):
-    eid = to_uuid(evento_id)
-    e = db.query(Evento).filter(Evento.id == eid).first()
+def remover_evento(
+    evento_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("administrador"))
+):
+    e = db.query(Evento).filter(Evento.id == evento_id).first()
     if not e:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     db.delete(e)

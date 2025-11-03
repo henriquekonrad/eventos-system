@@ -107,3 +107,12 @@ class IngressoSchema(BaseModel):
 
     class Config:
         orm_mode = True
+
+# ------------ Token --------------
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class LoginIn(BaseModel):
+    email: str
+    senha: str
