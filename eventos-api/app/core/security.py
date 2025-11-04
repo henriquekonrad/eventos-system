@@ -1,9 +1,9 @@
 from fastapi import Depends, HTTPException, status
 from app.models.usuario import Usuario
-from app.routers.auth import get_current_user
 from fastapi import Header, HTTPException, status
 from dotenv import load_dotenv
 import os
+from app.core.deps import get_current_user
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")

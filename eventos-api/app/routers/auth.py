@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from pydantic import BaseModel
@@ -10,12 +10,11 @@ from app.models.usuario import Usuario
 from app.core.config import settings
 from app import schemas
 from app.core.security import require_api_key
+from app.core.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 3 
@@ -33,16 +32,6 @@ def verificar_token(token: str):
         return payload
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    payload = verificar_token(token)
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token sem usuário")
-    user = db.query(Usuario).filter(Usuario.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
-    return user
 
 @router.post("/login", response_model=schemas.Token)
 def login(data: schemas.LoginIn, db: Session = Depends(get_db),
