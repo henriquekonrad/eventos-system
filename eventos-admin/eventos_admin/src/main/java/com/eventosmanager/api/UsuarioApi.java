@@ -12,9 +12,10 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+
 public class UsuarioApi {
     private static final String BASE_URL = AppConfig.get("API_BASE_URL");
-    private static final OkHttpClient client = new OkHttpClient();
+    private static final OkHttpClient client = ApiClient.getClient();
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static List<Usuario> listarUsuarios() throws IOException {
