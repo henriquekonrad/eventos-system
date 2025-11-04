@@ -29,11 +29,13 @@ def criar_evento(
     return evento
 
 @router.get("/", response_model=list[schemas.EventoOut])
-def listar_eventos(db: Session = Depends(get_db)):
+def listar_eventos(db: Session = Depends(get_db),
+                   api_key: None = Depends(require_api_key)):
     return db.query(Evento).order_by(Evento.inicio_em).all()
 
 @router.get("/{evento_id}", response_model=schemas.EventoOut)
-def obter_evento(evento_id: UUID, db: Session = Depends(get_db)):
+def obter_evento(evento_id: UUID, db: Session = Depends(get_db),
+                 api_key: None = Depends(require_api_key)):
     e = db.query(Evento).filter(Evento.id == evento_id).first()
     if not e:
         raise HTTPException(status_code=404, detail="Evento não encontrado")

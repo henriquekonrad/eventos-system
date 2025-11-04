@@ -97,17 +97,20 @@ def criar_inscricao_rapida(
 
 
 @router.get("/evento/{evento_id}", response_model=list[schemas.InscricaoOut])
-def listar_inscricoes_por_evento(evento_id: UUID, db: Session = Depends(get_db)):
+def listar_inscricoes_por_evento(evento_id: UUID, db: Session = Depends(get_db),
+                                 api_key: None = Depends(require_api_key)):
     return db.query(Inscricao).filter(Inscricao.evento_id == evento_id).all()
 
 
 @router.get("/usuario/{usuario_id}", response_model=list[schemas.InscricaoOut])
-def listar_inscricoes_por_usuario(usuario_id: UUID, db: Session = Depends(get_db)):
+def listar_inscricoes_por_usuario(usuario_id: UUID, db: Session = Depends(get_db),
+                                  api_key: None = Depends(require_api_key)):
     return db.query(Inscricao).filter(Inscricao.usuario_id == usuario_id).all()
 
 
 @router.get("/{inscricao_id}", response_model=schemas.InscricaoOut)
-def obter_inscricao(inscricao_id: UUID, db: Session = Depends(get_db)):
+def obter_inscricao(inscricao_id: UUID, db: Session = Depends(get_db),
+                    api_key: None = Depends(require_api_key)):
     inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscr:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")

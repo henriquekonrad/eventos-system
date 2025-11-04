@@ -51,7 +51,8 @@ def listar_usuarios(
 
 
 @router.get("/{usuario_id}", response_model=schemas.UsuarioOut)
-def obter_usuario(usuario_id: UUID, db: Session = Depends(get_db)):
+def obter_usuario(usuario_id: UUID, db: Session = Depends(get_db),
+                  api_key: None = Depends(require_api_key)):
     u = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")

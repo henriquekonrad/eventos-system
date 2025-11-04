@@ -50,7 +50,8 @@ def emitir_certificado(
 
 
 @router.get("/{codigo}", response_model=schemas.CertificadoOut)
-def obter_por_codigo(codigo: str, db: Session = Depends(get_db)):
+def obter_por_codigo(codigo: str, db: Session = Depends(get_db),
+                     api_key: None = Depends(require_api_key)):
     """
     Endpoint público para validação de certificados.
     Permite verificar autenticidade sem login.

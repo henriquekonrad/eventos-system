@@ -17,7 +17,8 @@ router = APIRouter(prefix="/ingressos", tags=["Ingressos"])
 
 
 @router.get("/evento/{evento_id}", response_model=List[IngressoSchema])
-def listar_ingressos_por_evento(evento_id: UUID, db: Session = Depends(get_db)):
+def listar_ingressos_por_evento(evento_id: UUID, db: Session = Depends(get_db),
+                                api_key: None = Depends(require_api_key)):
     ingressos = db.query(Ingresso).filter(Ingresso.evento_id == evento_id).all()
     if not ingressos:
         raise HTTPException(status_code=404, detail="Nenhum ingresso encontrado para este evento")
@@ -57,7 +58,8 @@ def criar_ingresso(
 
 
 @router.get("/validar/{token_qr}")
-def validar_ingresso(token_qr: str, db: Session = Depends(get_db)):
+def validar_ingresso(token_qr: str, db: Session = Depends(get_db),
+                     api_key: None = Depends(require_api_key)):
     ingresso = db.query(Ingresso).filter(Ingresso.token_qr == token_qr).first()
     if not ingresso:
         raise HTTPException(status_code=404, detail="Ingresso inválido ou não encontrado")
