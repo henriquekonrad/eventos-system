@@ -1,0 +1,158 @@
+"""
+Microsserviço de Inscrições
+Porta: 8004
+"""
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from uuid import UUID, uuid4
+from secrets import token_urlsafe
+import datetime
+import sys
+sys.path.append('..')
+
+from shared.core.database import get_db
+from shared.models.inscricao import Inscricao
+from shared.models.evento import Evento
+from shared.models.usuario import Usuario
+from shared import schemas
+from shared.core.security import require_roles
+
+app = FastAPI(title="Inscricoes Service", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+def health_check():
+    return {"service": "inscricoes-service", "status": "running"}
+
+
+@app.post("/", status_code=status.HTTP_201_CREATED)
+def criar_inscricao_normal(
+    evento_id: UUID,
+    usuario_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles("administrador", "atendente"))
+):
+    evento = db.query(Evento).filter(Evento.id == evento_id).first()
+    if not evento:
+        raise HTTPException(status_code=404, detail="Evento não encontrado")
+    
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    existente = db.query(Inscricao).filter(
+        Inscricao.evento_id == evento_id,
+        Inscricao.usuario_id == usuario_id
+    ).first()
+    
+    if existente:
+        raise HTTPException(status_code=400, detail="Usuário já inscrito neste evento")
+    
+    inscr = Inscricao(
+        evento_id=evento_id,
+        usuario_id=usuario_id,
+        inscricao_rapida=False,
+        status="ativa",
+        sincronizado=False
+    )
+    db.add(inscr)
+    db.commit()
+    db.refresh(inscr)
+    
+    return {"inscricao_id": str(inscr.id), "message": "Inscrição criada"}
+
+
+@app.post("/rapida", status_code=status.HTTP_201_CREATED)
+def criar_inscricao_rapida(
+    payload: schemas.InscricaoCreateRapida,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles("administrador", "atendente"))
+):
+    evento = db.query(Evento).filter(Evento.id == payload.evento_id).first()
+    if not evento:
+        raise HTTPException(status_code=404, detail="Evento não encontrado")
+    
+    email = payload.email_rapido or f"temp_{uuid4()}@rapido.local"
+    
+    usuario_rapido = Usuario(
+        nome=payload.nome_rapido,
+        email=email,
+        cpf=payload.cpf_rapido,
+        senha_hash=token_urlsafe(16),
+        papel="rapido",
+        email_verificado=False
+    )
+    db.add(usuario_rapido)
+    db.commit()
+    db.refresh(usuario_rapido)
+    
+    inscr = Inscricao(
+        evento_id=payload.evento_id,
+        usuario_id=usuario_rapido.id,
+        inscricao_rapida=True,
+        nome_rapido=payload.nome_rapido,
+        cpf_rapido=payload.cpf_rapido,
+        email_rapido=payload.email_rapido,
+        status="ativa",
+        sincronizado=False
+    )
+    db.add(inscr)
+    db.commit()
+    db.refresh(inscr)
+    
+    return {
+        "inscricao_id": str(inscr.id),
+        "usuario_id": str(usuario_rapido.id),
+        "message": "Inscrição rápida criada com usuário rápido associado"
+    }
+
+
+@app.get("/evento/{evento_id}", response_model=list[schemas.InscricaoOut])
+def listar_inscricoes_por_evento(evento_id: UUID, db: Session = Depends(get_db)):
+    return db.query(Inscricao).filter(Inscricao.evento_id == evento_id).all()
+
+
+@app.get("/usuario/{usuario_id}", response_model=list[schemas.InscricaoOut])
+def listar_inscricoes_por_usuario(usuario_id: UUID, db: Session = Depends(get_db)):
+    return db.query(Inscricao).filter(Inscricao.usuario_id == usuario_id).all()
+
+
+@app.get("/{inscricao_id}", response_model=schemas.InscricaoOut)
+def obter_inscricao(inscricao_id: UUID, db: Session = Depends(get_db)):
+    inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
+    if not inscr:
+        raise HTTPException(status_code=404, detail="Inscrição não encontrada")
+    return inscr
+
+
+@app.delete("/{inscricao_id}")
+def cancelar_inscricao(
+    inscricao_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles("administrador", "atendente"))
+):
+    inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
+    if not inscr:
+        raise HTTPException(status_code=404, detail="Inscrição não encontrada")
+    
+    inscr.status = "cancelada"
+    inscr.cancelado_em = datetime.datetime.utcnow()
+    inscr.sincronizado = False
+    db.add(inscr)
+    db.commit()
+    
+    return {"message": "Inscrição cancelada"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8004)
