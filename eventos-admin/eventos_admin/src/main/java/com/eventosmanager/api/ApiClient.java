@@ -9,10 +9,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-/**
- * Cliente HTTP centralizado que injeta cabeçalhos comuns (API_KEY, Authorization)
- * e expõe o OkHttpClient para uso nas APIs.
- */
 public class ApiClient {
 
     private static final String API_KEY = AppConfig.get("API_KEY");
