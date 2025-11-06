@@ -5,34 +5,53 @@ echo ""
 
 stop_service() {
     local service=$1
-    
-    if [ -f logs/${service}.pid ]; then
-        local pid=$(cat logs/${service}.pid)
-        if ps -p ${pid} > /dev/null 2>&1; then
+    local pid_file="logs/${service}.pid"
+
+    # Se existir PID, tenta parar normalmente
+    if [ -f "$pid_file" ]; then
+        local pid=$(cat "$pid_file")
+        if ps -p $pid > /dev/null 2>&1; then
             echo "  ⛔ Parando ${service} (PID: ${pid})..."
-            kill ${pid} 2>/dev/null
+            kill $pid 2>/dev/null
             sleep 1
-            # Força se ainda estiver rodando
-            if ps -p ${pid} > /dev/null 2>&1; then
-                kill -9 ${pid} 2>/dev/null
+            if ps -p $pid > /dev/null 2>&1; then
+                echo "  ⚠️  ${service} ainda está rodando — forçando parada"
+                kill -9 $pid 2>/dev/null
             fi
         else
-            echo "  ⚠️  ${service} já estava parado"
+            echo "  ⚠️  ${service} - PID encontrado mas processo inexistente"
         fi
-        rm logs/${service}.pid
+        rm -f "$pid_file"
     else
-        echo "  ⚪ ${service} não estava rodando"
+        # Tenta encontrar manualmente se rodando via nome
+        local found_pid=$(ps aux | grep "uvicorn.*${service}" | grep -v grep | awk '{print $2}')
+        if [ ! -z "$found_pid" ]; then
+            echo "  ⛔ Parando ${service} (detectado PID: ${found_pid})..."
+            kill $found_pid 2>/dev/null
+            sleep 1
+            if ps -p $found_pid > /dev/null 2>&1; then
+                kill -9 $found_pid 2>/dev/null
+            fi
+        else
+            echo "  ⚪ ${service} não estava rodando"
+        fi
     fi
 }
 
-# Parar todos os microsserviços
-stop_service "auth-service"
-stop_service "eventos-service"
-stop_service "usuarios-service"
-stop_service "inscricoes-service"
-stop_service "ingressos-service"
-stop_service "checkins-service"
-stop_service "certificados-service"
+# Lista de serviços
+SERVICES=(
+    "auth-service"
+    "eventos-service"
+    "usuarios-service"
+    "inscricoes-service"
+    "ingressos-service"
+    "checkins-service"
+    "certificados-service"
+)
+
+for service in "${SERVICES[@]}"; do
+    stop_service "$service"
+done
 
 echo ""
 echo "✅ Todos os serviços foram parados!"
