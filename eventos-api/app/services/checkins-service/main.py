@@ -3,7 +3,6 @@ Microsserviço de Check-ins
 Porta: 8006
 """
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from passlib.context import CryptContext
@@ -17,23 +16,21 @@ from shared.models.checkin import Checkin
 from shared.models.inscricao import Inscricao
 from shared.models.evento import Evento
 from shared.models.usuario import Usuario
-from shared.core.security import require_roles
+from shared.core.middleware import add_common_middleware
+from shared.core.security import (
+    require_jwt_and_service_key,
+    require_service_api_key
+)
 
 app = FastAPI(title="Checkins Service", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+add_common_middleware(app)
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 @app.get("/")
 def health_check():
+    """Público - Health check do serviço"""
     return {"service": "checkins-service", "status": "running"}
 
 
@@ -43,12 +40,20 @@ def registrar_checkin(
     ingresso_id: UUID,
     usuario_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles("atendente", "administrador"))
+    current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
 ):
+    """
+    Registra check-in para uma inscrição existente.
+    Vincula o check-in a um ingresso e usuário específicos.
+    
+    REQUER: API Key + JWT + Role (atendente OU administrador)
+    """
+    # Verificar se a inscrição existe
     inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscr:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
     
+    # Verificar se já existe check-in para este ingresso
     existente = (
         db.query(Checkin)
         .filter(
@@ -65,6 +70,7 @@ def registrar_checkin(
         )
     
     try:
+        # Usar transação para garantir consistência
         with db.begin():
             check = Checkin(
                 inscricao_id=inscricao_id,
@@ -74,6 +80,7 @@ def registrar_checkin(
             )
             db.add(check)
             
+            # Marcar inscrição como não sincronizada
             inscr.sincronizado = False
             db.add(inscr)
             
@@ -98,18 +105,35 @@ def checkin_rapido(
     email: str,
     ingresso_id: UUID | None = None,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles("atendente", "administrador"))
+    current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
 ):
+    """
+    Cria inscrição rápida, usuário rápido (caso não exista) e registra check-in.
+    Fluxo completo para check-in de pessoas sem cadastro prévio.
+    
+    Fluxo:
+    - Email, nome e CPF obrigatórios
+    - Senha temporária é gerada automaticamente
+    - Se usuário já existir (mesmo email), usa o existente
+    - Cria inscrição automática no evento
+    - Registra check-in imediatamente
+    
+    REQUER: API Key + JWT + Role (atendente OU administrador)
+    """
+    # Verificar se o evento existe
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
     try:
+        # Usar transação para garantir atomicidade
         with db.begin():
+            # Verificar se usuário já existe pelo email
             user = db.query(Usuario).filter(Usuario.email == email).first()
             senha_temp = None
             
             if not user:
+                # Criar novo usuário rápido
                 senha_temp = "temp_" + secrets.token_hex(4)
                 user = Usuario(
                     nome=nome,
@@ -120,8 +144,9 @@ def checkin_rapido(
                     ativo=True,
                 )
                 db.add(user)
-                db.flush()
+                db.flush()  # Flush para obter o ID do usuário
             
+            # Verificar se já existe inscrição
             inscr_existente = db.query(Inscricao).filter(
                 Inscricao.evento_id == evento_id,
                 Inscricao.usuario_id == user.id
@@ -130,6 +155,7 @@ def checkin_rapido(
             if inscr_existente:
                 inscr = inscr_existente
             else:
+                # Criar inscrição rápida
                 inscr = Inscricao(
                     evento_id=evento_id,
                     usuario_id=user.id,
@@ -141,8 +167,9 @@ def checkin_rapido(
                     sincronizado=False
                 )
                 db.add(inscr)
-                db.flush()
+                db.flush()  # Flush para obter o ID da inscrição
             
+            # Verificar se já existe check-in
             check_existente = db.query(Checkin).filter(
                 Checkin.inscricao_id == inscr.id
             ).first()
@@ -153,6 +180,7 @@ def checkin_rapido(
                     detail="Check-in já foi realizado para esta inscrição"
                 )
             
+            # Registrar check-in
             check = Checkin(
                 inscricao_id=inscr.id,
                 ingresso_id=ingresso_id or uuid4(),
@@ -162,6 +190,7 @@ def checkin_rapido(
             db.add(check)
             
     except HTTPException:
+        # Re-lançar HTTPExceptions (como "evento não encontrado")
         raise
     except Exception as e:
         raise HTTPException(
@@ -180,7 +209,17 @@ def checkin_rapido(
 
 
 @app.get("/inscricao/{inscricao_id}")
-def verificar_checkin(inscricao_id: UUID, db: Session = Depends(get_db)):
+def verificar_checkin(
+    inscricao_id: UUID,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("checkins"))
+):
+    """
+    Verifica se uma inscrição possui check-in registrado.
+    Retorna informações sobre todos os check-ins da inscrição.
+    
+    REQUER: API Key (sem JWT - permite verificação rápida)
+    """
     checkins = db.query(Checkin).filter(Checkin.inscricao_id == inscricao_id).all()
     
     if not checkins:
@@ -203,3 +242,80 @@ def verificar_checkin(inscricao_id: UUID, db: Session = Depends(get_db)):
             for c in checkins
         ]
     }
+
+
+@app.get("/evento/{evento_id}")
+def listar_checkins_evento(
+    evento_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
+):
+    """
+    Lista todos os check-ins de um evento específico.
+    Útil para relatórios de presença e estatísticas.
+    
+    REQUER: API Key + JWT + Role (atendente OU administrador)
+    """
+    checkins = (
+        db.query(Checkin)
+        .join(Inscricao, Inscricao.id == Checkin.inscricao_id)
+        .filter(Inscricao.evento_id == evento_id)
+        .all()
+    )
+    
+    return {
+        "evento_id": str(evento_id),
+        "total_checkins": len(checkins),
+        "checkins": [
+            {
+                "id": str(c.id),
+                "inscricao_id": str(c.inscricao_id),
+                "usuario_id": str(c.usuario_id),
+                "ingresso_id": str(c.ingresso_id),
+                "ocorrido_em": c.ocorrido_em
+            }
+            for c in checkins
+        ]
+    }
+
+
+@app.get("/estatisticas/{evento_id}")
+def estatisticas_checkin(
+    evento_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
+):
+    """
+    Retorna estatísticas de check-in de um evento.
+    
+    REQUER: API Key + JWT + Role (atendente OU administrador)
+    """
+    # Total de inscrições
+    total_inscricoes = db.query(Inscricao).filter(
+        Inscricao.evento_id == evento_id,
+        Inscricao.status == "ativa"
+    ).count()
+    
+    # Total de check-ins
+    total_checkins = (
+        db.query(Checkin)
+        .join(Inscricao, Inscricao.id == Checkin.inscricao_id)
+        .filter(Inscricao.evento_id == evento_id)
+        .count()
+    )
+    
+    # Calcular taxa de presença
+    taxa_presenca = (total_checkins / total_inscricoes * 100) if total_inscricoes > 0 else 0
+    
+    return {
+        "evento_id": str(evento_id),
+        "total_inscricoes": total_inscricoes,
+        "total_checkins": total_checkins,
+        "taxa_presenca": round(taxa_presenca, 2),
+        "ausentes": total_inscricoes - total_checkins
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8006)

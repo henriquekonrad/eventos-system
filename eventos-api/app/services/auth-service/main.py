@@ -3,7 +3,6 @@ Microsserviço de Autenticação
 Porta: 8001
 """
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
@@ -15,17 +14,13 @@ from shared.core.database import get_db
 from shared.models.usuario import Usuario
 from shared.core.config import settings
 from shared import schemas
+from shared.core.middleware import add_common_middleware
+from shared.core.security import require_service_api_key
 
 app = FastAPI(title="Auth Service", version="1.0.0")
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS compartilhado - substitui o bloco anterior
+add_common_middleware(app)
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -55,11 +50,21 @@ def verificar_token(token: str):
 
 @app.get("/")
 def health_check():
+    """Público - Health check do serviço"""
     return {"service": "auth-service", "status": "running"}
 
 
 @app.post("/login", response_model=schemas.Token)
-def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
+def login(
+    data: schemas.LoginIn,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("auth"))
+):
+    """
+    Realiza login e retorna token JWT.
+    
+    REQUER: API Key (sem JWT - é o endpoint que CRIA o JWT)
+    """
     user = db.query(Usuario).filter(Usuario.email == data.email).first()
     
     if not user or not pwd.verify(data.senha, user.senha_hash):
@@ -77,9 +82,15 @@ def login(data: schemas.LoginIn, db: Session = Depends(get_db)):
 
 
 @app.post("/validar-token")
-def validar_token(token: str):
+def validar_token(
+    token: str,
+    api_key: None = Depends(require_service_api_key("auth"))
+):
     """
-    Endpoint para outros microsserviços validarem tokens
+    Endpoint para outros microsserviços validarem tokens.
+    Útil para comunicação inter-serviços.
+    
+    REQUER: API Key (sem JWT - valida o JWT de outros)
     """
     try:
         payload = verificar_token(token)
@@ -89,9 +100,15 @@ def validar_token(token: str):
 
 
 @app.get("/me")
-def me(token: str, db: Session = Depends(get_db)):
+def me(
+    token: str,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("auth"))
+):
     """
-    Retorna dados do usuário autenticado
+    Retorna dados do usuário autenticado baseado no token.
+    
+    REQUER: API Key + token como query param
     """
     payload = verificar_token(token)
     user_id = payload.get("sub")

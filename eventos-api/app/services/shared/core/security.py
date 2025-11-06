@@ -108,18 +108,104 @@ def get_current_user_from_token(authorization: str = Header(...), db: Session = 
     return user
 
 
-def require_api_key(x_api_key: str = Header(...)):
+def require_api_key_and_jwt(
+    x_api_key: str = Header(...),
+    authorization: str = Header(...)
+):
     """
-    Valida API Key estática (opcional, para segurança adicional).
+    Valida TANTO API Key quanto JWT (segurança dupla).
     
     Uso:
-        @app.get("/protected")
-        def protected(api_key: None = Depends(require_api_key)):
-            return {"message": "API Key válida!"}
+        @app.post("/super-protegido")
+        def super_protegido(auth: dict = Depends(require_api_key_and_jwt)):
+            return {"message": "Autenticado!"}
     """
+    # Validar API Key
     if x_api_key != API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API Key inválida ou ausente"
+            detail="API Key inválida"
         )
-    return None
+    
+    # Validar JWT
+    payload = verificar_token_middleware(authorization)
+    return payload
+
+
+# ============================================
+# API KEY POR SERVIÇO
+# ============================================
+
+def require_service_api_key(service_name: str):
+    """
+    Valida API Key específica de um serviço.
+    Busca primeiro a chave específica (SERVICE_NAME_API_KEY),
+    se não encontrar, usa a chave global (API_KEY).
+    
+    Uso:
+        @app.get("/eventos")
+        def listar(api_key: None = Depends(require_service_api_key("eventos"))):
+            return eventos
+    """
+    def wrapper(x_api_key: str = Header(...)):
+        # Buscar chave específica do serviço
+        service_key = os.getenv(f"{service_name.upper()}_API_KEY")
+        
+        # Se não encontrar, usar chave global
+        if not service_key:
+            service_key = API_KEY
+        
+        if x_api_key != service_key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"API Key inválida para o serviço {service_name}"
+            )
+        return None
+    
+    return wrapper
+
+
+def require_jwt_and_service_key(service_name: str, *roles: str):
+    """
+    Valida TANTO JWT quanto API Key do serviço.
+    Também verifica o papel do usuário se roles forem fornecidas.
+    
+    Uso:
+        # Apenas JWT + API Key
+        @app.post("/eventos")
+        def criar(auth: dict = Depends(require_jwt_and_service_key("eventos"))):
+            return {"user_id": auth["sub"]}
+        
+        # JWT + API Key + Role específica
+        @app.post("/eventos")
+        def criar(auth: dict = Depends(require_jwt_and_service_key("eventos", "administrador"))):
+            return {"user_id": auth["sub"]}
+    """
+    def wrapper(
+        x_api_key: str = Header(...),
+        authorization: str = Header(...)
+    ):
+        # 1. Validar API Key do serviço
+        service_key = os.getenv(f"{service_name.upper()}_API_KEY", API_KEY)
+        
+        if x_api_key != service_key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"API Key inválida para o serviço {service_name}"
+            )
+        
+        # 2. Validar JWT
+        payload = verificar_token_middleware(authorization)
+        
+        # 3. Validar role (se fornecida)
+        if roles:
+            user_role = payload.get("role")
+            if user_role not in roles:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Acesso negado. Papéis permitidos: {', '.join(roles)}"
+                )
+        
+        return payload
+    
+    return wrapper

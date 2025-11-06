@@ -3,7 +3,6 @@ Microsserviço de Ingressos
 Porta: 8005
 """
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from typing import List
@@ -17,32 +16,33 @@ from shared.models.ingresso import Ingresso
 from shared.models.inscricao import Inscricao
 from shared.models.evento import Evento
 from shared.schemas import IngressoSchema
-from shared.core.security import require_roles
+from shared.core.middleware import add_common_middleware
+from shared.core.security import (
+    require_jwt_and_service_key,
+    require_service_api_key
+)
 
 app = FastAPI(title="Ingressos Service", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+add_common_middleware(app)
 
 
 @app.get("/")
 def health_check():
+    """Público - Health check do serviço"""
     return {"service": "ingressos-service", "status": "running"}
 
 
 @app.get("/evento/{evento_id}", response_model=List[IngressoSchema])
 def listar_ingressos_por_evento(
     evento_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("ingressos"))
 ):
     """
     Lista todos os ingressos de um evento específico.
-    Endpoint público (não precisa de autenticação).
+    Útil para relatórios e gestão de ingressos.
+    
+    REQUER: API Key (sem JWT - permite consulta para sistemas de gestão)
     """
     ingressos = db.query(Ingresso).filter(Ingresso.evento_id == evento_id).all()
     
@@ -59,11 +59,15 @@ def listar_ingressos_por_evento(
 def criar_ingresso(
     inscricao_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles("administrador", "atendente"))
+    current_user: dict = Depends(require_jwt_and_service_key("ingressos", "administrador", "atendente"))
 ):
     """
     Cria um ingresso para uma inscrição existente.
-    Apenas administradores e atendentes podem criar ingressos.
+    Gera automaticamente:
+    - Código único do ingresso (formato: ING-XXXXXXXX)
+    - Token QR para validação (hash SHA256)
+    
+    REQUER: API Key + JWT + Role (administrador OU atendente)
     """
     inscricao = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscricao:
@@ -73,10 +77,21 @@ def criar_ingresso(
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
+    # Verificar se já existe ingresso para esta inscrição
+    ingresso_existente = db.query(Ingresso).filter(
+        Ingresso.inscricao_id == inscricao_id
+    ).first()
+    
+    if ingresso_existente:
+        raise HTTPException(
+            status_code=400,
+            detail="Já existe um ingresso para esta inscrição"
+        )
+    
     # Gerar código único do ingresso
     codigo = f"ING-{uuid4().hex[:8].upper()}"
     
-    # Gerar token QR único
+    # Gerar token QR único (hash SHA256)
     token_qr = hashlib.sha256(f"{codigo}-{inscricao_id}".encode()).hexdigest()
     
     ingresso = Ingresso(
@@ -102,7 +117,10 @@ def validar_ingresso(
 ):
     """
     Valida um ingresso através do token QR.
-    Endpoint público para leitores de QR Code.
+    Endpoint PÚBLICO usado por leitores de QR Code na entrada do evento.
+    Não requer autenticação para permitir validação rápida na portaria.
+    
+    REQUER: Nada (público para validação na entrada)
     """
     ingresso = db.query(Ingresso).filter(Ingresso.token_qr == token_qr).first()
     
@@ -133,11 +151,13 @@ def validar_ingresso(
 def marcar_ingresso_usado(
     ingresso_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles("administrador", "atendente"))
+    current_user: dict = Depends(require_jwt_and_service_key("ingressos", "administrador", "atendente"))
 ):
     """
     Marca um ingresso como usado (check-in realizado).
-    Apenas administradores e atendentes podem marcar.
+    Uma vez marcado, não pode ser utilizado novamente.
+    
+    REQUER: API Key + JWT + Role (administrador OU atendente)
     """
     ingresso = db.query(Ingresso).filter(Ingresso.id == ingresso_id).first()
     
@@ -164,10 +184,14 @@ def marcar_ingresso_usado(
 @app.get("/{ingresso_id}", response_model=IngressoSchema)
 def obter_ingresso(
     ingresso_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("ingressos"))
 ):
     """
     Obtém detalhes de um ingresso específico pelo ID.
+    Útil para consultas internas e sistemas de gestão.
+    
+    REQUER: API Key (sem JWT - busca por ID interno)
     """
     ingresso = db.query(Ingresso).filter(Ingresso.id == ingresso_id).first()
     
@@ -175,6 +199,73 @@ def obter_ingresso(
         raise HTTPException(status_code=404, detail="Ingresso não encontrado")
     
     return ingresso
+
+
+@app.get("/inscricao/{inscricao_id}/ingresso", response_model=IngressoSchema)
+def obter_ingresso_por_inscricao(
+    inscricao_id: UUID,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("ingressos"))
+):
+    """
+    Obtém o ingresso de uma inscrição específica.
+    Retorna erro 404 se a inscrição não tiver ingresso emitido.
+    
+    REQUER: API Key (sem JWT - consulta por inscrição)
+    """
+    ingresso = db.query(Ingresso).filter(Ingresso.inscricao_id == inscricao_id).first()
+    
+    if not ingresso:
+        raise HTTPException(
+            status_code=404,
+            detail="Ingresso não encontrado para esta inscrição"
+        )
+    
+    return ingresso
+
+
+@app.get("/evento/{evento_id}/estatisticas")
+def estatisticas_ingressos(
+    evento_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_jwt_and_service_key("ingressos", "atendente", "administrador"))
+):
+    """
+    Retorna estatísticas de ingressos de um evento.
+    
+    REQUER: API Key + JWT + Role (atendente OU administrador)
+    """
+    # Verificar se evento existe
+    evento = db.query(Evento).filter(Evento.id == evento_id).first()
+    if not evento:
+        raise HTTPException(status_code=404, detail="Evento não encontrado")
+    
+    # Contar ingressos por status
+    total_emitidos = db.query(Ingresso).filter(
+        Ingresso.evento_id == evento_id,
+        Ingresso.status == "emitido"
+    ).count()
+    
+    total_usados = db.query(Ingresso).filter(
+        Ingresso.evento_id == evento_id,
+        Ingresso.status == "usado"
+    ).count()
+    
+    total_ingressos = db.query(Ingresso).filter(
+        Ingresso.evento_id == evento_id
+    ).count()
+    
+    # Calcular taxa de utilização
+    taxa_utilizacao = (total_usados / total_ingressos * 100) if total_ingressos > 0 else 0
+    
+    return {
+        "evento_id": str(evento_id),
+        "total_ingressos": total_ingressos,
+        "emitidos": total_emitidos,
+        "usados": total_usados,
+        "taxa_utilizacao": round(taxa_utilizacao, 2),
+        "nao_usados": total_emitidos
+    }
 
 
 if __name__ == "__main__":
