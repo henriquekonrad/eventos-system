@@ -24,12 +24,6 @@ app = FastAPI(title="Ingressos Service", version="1.0.0")
 add_common_middleware(app)
 
 
-@app.get("/")
-def health_check():
-    """Público - Health check do serviço"""
-    return {"service": "ingressos-service", "status": "running"}
-
-
 @app.get("/evento/{evento_id}", response_model=List[IngressoSchema])
 def listar_ingressos_por_evento(
     evento_id: UUID,

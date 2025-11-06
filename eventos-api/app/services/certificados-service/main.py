@@ -24,12 +24,6 @@ app = FastAPI(title="Certificados Service", version="1.0.0")
 add_common_middleware(app)
 
 
-@app.get("/")
-def health_check():
-    """Público - Health check do serviço"""
-    return {"service": "certificados-service", "status": "running"}
-
-
 @app.post("/emitir", response_model=schemas.CertificadoOut, status_code=status.HTTP_201_CREATED)
 def emitir_certificado(
     payload: schemas.CertificadoCreate,
