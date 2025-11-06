@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
-from app.core.database import Base
+from app.shared.core.database import Base
 import datetime
 
 class Usuario(Base):

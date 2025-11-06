@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
-from app.core.database import Base
+from app.shared.core.database import Base
 
 class Evento(Base):
     __tablename__ = "eventos"

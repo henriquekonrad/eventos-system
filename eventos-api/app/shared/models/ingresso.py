@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import datetime
-from app.core.database import Base
+from app.shared.core.database import Base
 
 
 class Ingresso(Base):

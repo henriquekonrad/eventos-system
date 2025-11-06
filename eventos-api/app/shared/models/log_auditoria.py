@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, DateTime, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import datetime
-from app.core.database import Base
+from app.shared.core.database import Base
 
 class LogAuditoria(Base):
     __tablename__ = "logs_auditoria"

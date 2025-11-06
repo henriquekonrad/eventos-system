@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Importar após load_dotenv
-from .config import settings
-from .database import get_db
+from app.shared.core.config import settings
+from app.shared.core.database import get_db
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM

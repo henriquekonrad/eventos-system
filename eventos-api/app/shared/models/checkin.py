@@ -1,7 +1,7 @@
 from sqlalchemy import Column, DateTime, String, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid, datetime
-from app.core.database import Base
+from app.shared.core.database import Base
 
 class Checkin(Base):
     __tablename__ = "checkins"
