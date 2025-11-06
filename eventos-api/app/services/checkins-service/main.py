@@ -8,16 +8,14 @@ from uuid import UUID, uuid4
 from passlib.context import CryptContext
 import datetime
 import secrets
-import sys
-sys.path.append('..')
 
-from shared.core.database import get_db
-from shared.models.checkin import Checkin
-from shared.models.inscricao import Inscricao
-from shared.models.evento import Evento
-from shared.models.usuario import Usuario
-from shared.core.middleware import add_common_middleware
-from shared.core.security import (
+from app.shared.core.database import get_db
+from app.shared.models.checkin import Checkin
+from app.shared.models.inscricao import Inscricao
+from app.shared.models.evento import Evento
+from app.shared.models.usuario import Usuario
+from app.shared.core.middleware import add_common_middleware
+from app.shared.core.security import (
     require_jwt_and_service_key,
     require_service_api_key
 )

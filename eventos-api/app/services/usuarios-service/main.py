@@ -7,13 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from uuid import UUID
 from passlib.context import CryptContext
-import sys
-sys.path.append('..')
 
-from shared.core.database import get_db
-from shared.models.usuario import Usuario
-from shared import schemas
-from shared.core.security import require_roles
+from app.shared.core.database import get_db
+from app.shared.models.usuario import Usuario
+from app.shared import schemas
+from app.shared.core.security import require_roles
 
 app = FastAPI(title="Usuarios Service", version="1.0.0")
 
