@@ -42,7 +42,6 @@ def emitir_certificado(
     
     REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    # Verificar se a inscrição existe e pertence ao evento
     inscr = db.query(Inscricao).filter(
         Inscricao.id == payload.inscricao_id,
         Inscricao.evento_id == payload.evento_id
@@ -54,7 +53,6 @@ def emitir_certificado(
             detail="Inscrição não encontrada para este evento"
         )
     
-    # Verificar se houve check-in
     check = db.query(Checkin).filter(Checkin.inscricao_id == payload.inscricao_id).first()
     
     if not check:
@@ -63,7 +61,6 @@ def emitir_certificado(
             detail="Não é possível emitir certificado sem registro de presença (check-in)"
         )
     
-    # Verificar se já existe certificado
     cert_existente = db.query(Certificado).filter(
         Certificado.inscricao_id == payload.inscricao_id,
         Certificado.evento_id == payload.evento_id
@@ -75,7 +72,6 @@ def emitir_certificado(
             detail="Certificado já foi emitido para esta inscrição"
         )
     
-    # Gerar código único do certificado
     codigo = secrets.token_urlsafe(12)
     
     cert = Certificado(

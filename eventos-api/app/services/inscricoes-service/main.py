@@ -23,12 +23,6 @@ app = FastAPI(title="Inscricoes Service", version="1.0.0")
 add_common_middleware(app)
 
 
-@app.get("/")
-def health_check():
-    """Público - Health check do serviço"""
-    return {"service": "inscricoes-service", "status": "running"}
-
-
 @app.post("/", status_code=status.HTTP_201_CREATED)
 def criar_inscricao_normal(
     evento_id: UUID,
@@ -49,7 +43,6 @@ def criar_inscricao_normal(
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    # Verificar se já existe inscrição
     existente = db.query(Inscricao).filter(
         Inscricao.evento_id == evento_id,
         Inscricao.usuario_id == usuario_id
@@ -173,30 +166,6 @@ def obter_inscricao(
     return inscr
 
 
-@app.delete("/{inscricao_id}")
-def cancelar_inscricao(
-    inscricao_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
-):
-    """
-    Cancela uma inscrição existente.
-    Marca o status como "cancelada" e registra data/hora.
-    
-    REQUER: API Key + JWT + Role (administrador OU atendente)
-    """
-    inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
-    if not inscr:
-        raise HTTPException(status_code=404, detail="Inscrição não encontrada")
-    
-    inscr.status = "cancelada"
-    inscr.cancelado_em = datetime.datetime.utcnow()
-    inscr.sincronizado = False
-    db.add(inscr)
-    db.commit()
-    
-    return {"message": "Inscrição cancelada"}
-
 
 @app.get("/evento/{evento_id}/estatisticas")
 def estatisticas_inscricoes(
@@ -209,12 +178,10 @@ def estatisticas_inscricoes(
     
     REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    # Verificar se evento existe
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
-    # Contar inscrições por status
     total_ativas = db.query(Inscricao).filter(
         Inscricao.evento_id == evento_id,
         Inscricao.status == "ativa"

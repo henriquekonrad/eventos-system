@@ -20,10 +20,8 @@ def add_cors_middleware(app: FastAPI):
         app = FastAPI()
         add_cors_middleware(app)
     """
-    # Obter origens permitidas do .env (opcional)
     allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
     
-    # Se for "*", usar lista com "*", senão fazer split por vírgula
     if allowed_origins_str == "*":
         allowed_origins = ["*"]
     else:
@@ -33,10 +31,9 @@ def add_cors_middleware(app: FastAPI):
         CORSMiddleware,
         allow_origins=allowed_origins,  # ["http://localhost:3000", "https://seusite.com"]
         allow_credentials=True,
-        allow_methods=["*"],  # Permite todos os métodos (GET, POST, PUT, DELETE, etc)
-        allow_headers=["*"],  # Permite todos os headers
-        expose_headers=["*"],
-        max_age=3600,  # Cache das preflight requests por 1 hora
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"]
     )
     
     return app
@@ -57,5 +54,6 @@ def add_common_middleware(app: FastAPI):
     
     # Adicione outros middlewares aqui no futuro
     # Ex: Logging, Rate Limiting, etc
+    # POSSO ADICIONAR UM DECORATOR PARA ISSO!!!
     
     return app

@@ -26,12 +26,6 @@ add_common_middleware(app)
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-@app.get("/")
-def health_check():
-    """Público - Health check do serviço"""
-    return {"service": "checkins-service", "status": "running"}
-
-
 @app.post("/", status_code=status.HTTP_201_CREATED)
 def registrar_checkin(
     inscricao_id: UUID,
@@ -46,12 +40,10 @@ def registrar_checkin(
     
     REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    # Verificar se a inscrição existe
     inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscr:
         raise HTTPException(status_code=404, detail="Inscrição não encontrada")
     
-    # Verificar se já existe check-in para este ingresso
     existente = (
         db.query(Checkin)
         .filter(
@@ -68,7 +60,6 @@ def registrar_checkin(
         )
     
     try:
-        # Usar transação para garantir consistência
         with db.begin():
             check = Checkin(
                 inscricao_id=inscricao_id,
@@ -78,7 +69,6 @@ def registrar_checkin(
             )
             db.add(check)
             
-            # Marcar inscrição como não sincronizada
             inscr.sincronizado = False
             db.add(inscr)
             
@@ -118,20 +108,16 @@ def checkin_rapido(
     
     REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    # Verificar se o evento existe
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
     try:
-        # Usar transação para garantir atomicidade
         with db.begin():
-            # Verificar se usuário já existe pelo email
             user = db.query(Usuario).filter(Usuario.email == email).first()
             senha_temp = None
             
             if not user:
-                # Criar novo usuário rápido
                 senha_temp = "temp_" + secrets.token_hex(4)
                 user = Usuario(
                     nome=nome,
@@ -142,9 +128,8 @@ def checkin_rapido(
                     ativo=True,
                 )
                 db.add(user)
-                db.flush()  # Flush para obter o ID do usuário
+                db.flush()
             
-            # Verificar se já existe inscrição
             inscr_existente = db.query(Inscricao).filter(
                 Inscricao.evento_id == evento_id,
                 Inscricao.usuario_id == user.id
@@ -153,7 +138,6 @@ def checkin_rapido(
             if inscr_existente:
                 inscr = inscr_existente
             else:
-                # Criar inscrição rápida
                 inscr = Inscricao(
                     evento_id=evento_id,
                     usuario_id=user.id,
@@ -165,9 +149,8 @@ def checkin_rapido(
                     sincronizado=False
                 )
                 db.add(inscr)
-                db.flush()  # Flush para obter o ID da inscrição
+                db.flush()
             
-            # Verificar se já existe check-in
             check_existente = db.query(Checkin).filter(
                 Checkin.inscricao_id == inscr.id
             ).first()
@@ -178,7 +161,6 @@ def checkin_rapido(
                     detail="Check-in já foi realizado para esta inscrição"
                 )
             
-            # Registrar check-in
             check = Checkin(
                 inscricao_id=inscr.id,
                 ingresso_id=ingresso_id or uuid4(),
@@ -188,7 +170,6 @@ def checkin_rapido(
             db.add(check)
             
     except HTTPException:
-        # Re-lançar HTTPExceptions (como "evento não encontrado")
         raise
     except Exception as e:
         raise HTTPException(
@@ -288,13 +269,11 @@ def estatisticas_checkin(
     
     REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    # Total de inscrições
     total_inscricoes = db.query(Inscricao).filter(
         Inscricao.evento_id == evento_id,
         Inscricao.status == "ativa"
     ).count()
     
-    # Total de check-ins
     total_checkins = (
         db.query(Checkin)
         .join(Inscricao, Inscricao.id == Checkin.inscricao_id)
@@ -302,7 +281,6 @@ def estatisticas_checkin(
         .count()
     )
     
-    # Calcular taxa de presença
     taxa_presenca = (total_checkins / total_inscricoes * 100) if total_inscricoes > 0 else 0
     
     return {

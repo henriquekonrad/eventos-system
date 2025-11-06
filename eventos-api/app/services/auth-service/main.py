@@ -17,7 +17,6 @@ from app.shared.core.security import require_service_api_key
 
 app = FastAPI(title="Auth Service", version="1.0.0")
 
-# CORS compartilhado - substitui o bloco anterior
 add_common_middleware(app)
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -44,13 +43,7 @@ def verificar_token(token: str):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido"
         )
-
-
-@app.get("/")
-def health_check():
-    """Público - Health check do serviço"""
-    return {"service": "auth-service", "status": "running"}
-
+    
 
 @app.post("/login", response_model=schemas.Token)
 def login(

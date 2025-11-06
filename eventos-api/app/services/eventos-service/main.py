@@ -18,36 +18,6 @@ from app.shared.core.security import (
 app = FastAPI(title="Eventos Service", version="1.0.0")
 add_common_middleware(app)
 
-
-@app.get("/")
-def health_check():
-    """Público - Health check do serviço"""
-    return {"service": "eventos-service", "status": "running"}
-
-
-@app.post("/eventos", response_model=schemas.EventoOut, status_code=status.HTTP_201_CREATED)
-def criar_evento(
-    payload: schemas.EventoCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_jwt_and_service_key("eventos", "administrador"))
-):
-    """
-    Cria um novo evento.
-    
-    REQUER: API Key + JWT + Role "administrador"
-    """
-    evento = Evento(
-        titulo=payload.titulo,
-        descricao=payload.descricao,
-        inicio_em=payload.inicio_em,
-        fim_em=payload.fim_em
-    )
-    db.add(evento)
-    db.commit()
-    db.refresh(evento)
-    return evento
-
-
 @app.get("/eventos", response_model=list[schemas.EventoOut])
 def listar_eventos(
     db: Session = Depends(get_db),
@@ -76,52 +46,6 @@ def obter_evento(
     if not e:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     return e
-
-
-@app.put("/eventos/{evento_id}", response_model=schemas.EventoOut)
-def atualizar_evento(
-    evento_id: UUID,
-    payload: schemas.EventoCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_jwt_and_service_key("eventos", "administrador"))
-):
-    """
-    Atualiza os dados de um evento existente.
-    
-    REQUER: API Key + JWT + Role "administrador"
-    """
-    e = db.query(Evento).filter(Evento.id == evento_id).first()
-    if not e:
-        raise HTTPException(status_code=404, detail="Evento não encontrado")
-    
-    e.titulo = payload.titulo
-    e.descricao = payload.descricao
-    e.inicio_em = payload.inicio_em
-    e.fim_em = payload.fim_em
-    db.add(e)
-    db.commit()
-    db.refresh(e)
-    return e
-
-
-@app.delete("/eventos/{evento_id}")
-def remover_evento(
-    evento_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_jwt_and_service_key("eventos", "administrador"))
-):
-    """
-    Remove um evento do sistema.
-    
-    REQUER: API Key + JWT + Role "administrador"
-    """
-    e = db.query(Evento).filter(Evento.id == evento_id).first()
-    if not e:
-        raise HTTPException(status_code=404, detail="Evento não encontrado")
-    
-    db.delete(e)
-    db.commit()
-    return {"message": "evento removido"}
 
 
 @app.get("/eventos/publicos/ativos", response_model=list[schemas.EventoOut])
@@ -159,18 +83,15 @@ def estatisticas_evento(
     from shared.models.checkin import Checkin
     from shared.models.certificado import Certificado
     
-    # Verificar se evento existe
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
-    # Contar inscrições
     total_inscricoes = db.query(Inscricao).filter(
         Inscricao.evento_id == evento_id,
         Inscricao.status == "ativa"
     ).count()
     
-    # Contar check-ins
     total_checkins = (
         db.query(Checkin)
         .join(Inscricao, Inscricao.id == Checkin.inscricao_id)
@@ -178,13 +99,11 @@ def estatisticas_evento(
         .count()
     )
     
-    # Contar certificados emitidos
     total_certificados = db.query(Certificado).filter(
         Certificado.evento_id == evento_id,
         Certificado.revogado == False
     ).count()
     
-    # Calcular taxas
     taxa_presenca = (total_checkins / total_inscricoes * 100) if total_inscricoes > 0 else 0
     taxa_certificacao = (total_certificados / total_checkins * 100) if total_checkins > 0 else 0
     

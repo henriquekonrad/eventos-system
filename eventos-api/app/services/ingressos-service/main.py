@@ -75,7 +75,6 @@ def criar_ingresso(
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
-    # Verificar se já existe ingresso para esta inscrição
     ingresso_existente = db.query(Ingresso).filter(
         Ingresso.inscricao_id == inscricao_id
     ).first()
@@ -86,7 +85,6 @@ def criar_ingresso(
             detail="Já existe um ingresso para esta inscrição"
         )
     
-    # Gerar código único do ingresso
     codigo = f"ING-{uuid4().hex[:8].upper()}"
     
     # Gerar token QR único (hash SHA256)
@@ -233,12 +231,10 @@ def estatisticas_ingressos(
     
     REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    # Verificar se evento existe
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
-    # Contar ingressos por status
     total_emitidos = db.query(Ingresso).filter(
         Ingresso.evento_id == evento_id,
         Ingresso.status == "emitido"
