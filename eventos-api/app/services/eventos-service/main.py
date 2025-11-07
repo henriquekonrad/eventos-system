@@ -9,14 +9,14 @@ from uuid import UUID
 from app.shared.core.database import get_db
 from app.shared.models.evento import Evento
 from app.shared import schemas
-from app.shared.core.middleware import add_common_middleware
+from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import (
     require_jwt_and_service_key,
     require_service_api_key
 )
 
 app = FastAPI(title="Eventos Service", version="1.0.0")
-add_common_middleware(app)
+add_common_middlewares(app, audit=True)
 
 @app.get("/eventos", response_model=list[schemas.EventoOut])
 def listar_eventos(

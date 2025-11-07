@@ -13,7 +13,7 @@ from app.shared.models.certificado import Certificado
 from app.shared.models.inscricao import Inscricao
 from app.shared.models.checkin import Checkin
 from app.shared import schemas
-from app.shared.core.middleware import add_common_middleware
+from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import (
     require_jwt_and_service_key,
     require_service_api_key,
@@ -21,7 +21,7 @@ from app.shared.core.security import (
 )
 
 app = FastAPI(title="Certificados Service", version="1.0.0")
-add_common_middleware(app)
+add_common_middlewares(app, audit=True)
 
 
 @app.post("/emitir", response_model=schemas.CertificadoOut, status_code=status.HTTP_201_CREATED)

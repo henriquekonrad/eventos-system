@@ -13,14 +13,14 @@ from app.shared.models.inscricao import Inscricao
 from app.shared.models.evento import Evento
 from app.shared.models.usuario import Usuario
 from app.shared import schemas
-from app.shared.core.middleware import add_common_middleware
+from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import (
     require_jwt_and_service_key,
     require_service_api_key
 )
 
 app = FastAPI(title="Inscricoes Service", version="1.0.0")
-add_common_middleware(app)
+add_common_middlewares(app, audit=True)
 
 
 @app.post("/", status_code=status.HTTP_201_CREATED)

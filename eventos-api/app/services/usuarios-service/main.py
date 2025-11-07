@@ -11,17 +11,11 @@ from passlib.context import CryptContext
 from app.shared.core.database import get_db
 from app.shared.models.usuario import Usuario
 from app.shared import schemas
+from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import require_roles
 
 app = FastAPI(title="Usuarios Service", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+add_common_middlewares(app, audit=True)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

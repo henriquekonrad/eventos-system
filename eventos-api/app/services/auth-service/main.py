@@ -12,12 +12,11 @@ from app.shared.core.database import get_db
 from app.shared.models.usuario import Usuario
 from app.shared.core.config import settings
 from app.shared import schemas
-from app.shared.core.middleware import add_common_middleware
+from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import require_service_api_key
 
 app = FastAPI(title="Auth Service", version="1.0.0")
-
-add_common_middleware(app)
+add_common_middlewares(app, audit=True, light=True)
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
