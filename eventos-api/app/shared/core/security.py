@@ -2,7 +2,7 @@
 shared/core/security.py
 Funções de segurança compartilhadas entre TODOS os microsserviços
 """
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Request
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 import os
@@ -182,6 +182,7 @@ def require_jwt_and_service_key(service_name: str, *roles: str):
             return {"user_id": auth["sub"]}
     """
     def wrapper(
+        request: Request, 
         x_api_key: str = Header(...),
         authorization: str = Header(...)
     ):
