@@ -9,6 +9,7 @@ class UsuarioCreate(BaseModel):
     email: EmailStr
     senha: str
     cpf: Optional[str] = None
+    papel: Optional[str] = None
 
 class UsuarioOut(BaseModel):
     id: UUID

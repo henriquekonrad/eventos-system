@@ -45,7 +45,7 @@ def criar_usuario(
         email=u.email,
         senha_hash=hash_password(u.senha),
         cpf=u.cpf,
-        papel=u.papel if hasattr(u, "papel") else "usuario",
+        papel=u.papel if hasattr(u, "papel") else "participante",
         email_verificado=False
     )
     db.add(usuario)
