@@ -185,19 +185,15 @@ def require_jwt_and_service_key(service_name: str, *roles: str):
         x_api_key: str = Header(...),
         authorization: str = Header(...)
     ):
-        # 1. Validar API Key do serviço
         service_key = os.getenv(f"{service_name.upper()}_API_KEY", API_KEY)
-        
         if x_api_key != service_key:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"API Key inválida para o serviço {service_name}"
             )
         
-        # 2. Validar JWT
         payload = verificar_token_middleware(authorization)
         
-        # 3. Validar role (se fornecida)
         if roles:
             user_role = payload.get("role")
             if user_role not in roles:
@@ -206,6 +202,8 @@ def require_jwt_and_service_key(service_name: str, *roles: str):
                     detail=f"Acesso negado. Papéis permitidos: {', '.join(roles)}"
                 )
         
+        request.state.user = payload
+
         return payload
     
     return wrapper
