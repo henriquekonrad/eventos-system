@@ -1,7 +1,7 @@
 from app.shared.middlewares.cors import add_cors_middleware
 from fastapi import FastAPI
-from shared.middlewares.auditoria import auditoria_middleware
-from shared.middlewares.auditoria import auditoria_middleware_light
+from app.shared.middlewares.auditoria import auditoria_middleware
+from app.shared.middlewares.auditoria import auditoria_middleware_light
 
 def add_common_middlewares(app: FastAPI, audit: bool = False, light: bool = False):
     """

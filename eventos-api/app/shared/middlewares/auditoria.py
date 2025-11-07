@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 import datetime
 import traceback
 import json
-from shared.models.log_auditoria import LogAuditoria
+from app.shared.models.log_auditoria import LogAuditoria
 
 async def auditoria_middleware(request: Request, call_next):
     """
