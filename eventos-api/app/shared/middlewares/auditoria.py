@@ -1,145 +1,55 @@
-"""
-shared/middlewares/auditoria.py
-Middleware de auditoria para registrar todas as requisições
-"""
-from fastapi import Request, Response
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-import datetime
+from fastapi import Request
+from app.shared.helpers.auditoria_helper import AuditoriaService
+from app.shared.core.database import SessionLocal
 import traceback
-import io
-from app.shared.models.log_auditoria import LogAuditoria
-
 
 async def auditoria_middleware(request: Request, call_next):
     """
-    Registra um log na tabela logs_auditoria para cada request.
+    Middleware de auditoria seguindo Single Responsibility Principle.
     
-    Captura:
-    - Método HTTP
-    - Caminho da requisição
-    - Payload da requisição
-    - Payload da resposta
-    - Código de status
-    - IP do cliente
-    - ID do usuário (se autenticado)
+    Responsabilidades:
+    1. Capturar metadados da requisição/resposta
+    2. Delegar persistência ao Service Layer
+    
+    NÃO faz:
+    - Gerenciamento de sessão DB (usa sua própria)
+    - Lógica de negócio
+    - Acoplamento com outros middlewares
     """
-    # Capturar payload da requisição
-    try:
-        raw_req_body = await request.body()
-        if raw_req_body:
-            payload_requisicao = raw_req_body.decode("utf-8", errors="ignore")
-            # Limitar tamanho do payload
-            if len(payload_requisicao) > 5000:
-                payload_requisicao = payload_requisicao[:5000] + "... (truncado)"
-        else:
-            payload_requisicao = ""
-    except Exception as e:
-        payload_requisicao = f"Erro ao capturar: {str(e)}"
     
-    # Processar a requisição
+    # Capturar metadados (não lê body para não consumir stream)
+    metodo = request.method
+    caminho = request.url.path
+    ip_cliente = request.client.host if request.client else None
+    
+    # Obter usuario_id se disponível
+    usuario_id = None
+    if hasattr(request.state, "user"):
+        user = getattr(request.state, "user", None)
+        if user:
+            usuario_id = getattr(user, "id", None)
+    
+    # Processar requisição
     response = await call_next(request)
     
-    # Capturar payload da resposta
-    payload_resposta = ""
+    # Registrar auditoria de forma assíncrona (não bloqueia response)
     try:
-        # Para StreamingResponse, precisamos consumir o corpo
-        if isinstance(response, StreamingResponse):
-            response_body = b""
-            async for chunk in response.body_iterator:
-                response_body += chunk
-            
-            payload_resposta = response_body.decode("utf-8", errors="ignore")
-            
-            # Recriar a resposta com o mesmo corpo
-            response = Response(
-                content=response_body,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type
+        # Cria SUA PRÓPRIA sessão (independente de outros middlewares)
+        db = SessionLocal()
+        try:
+            AuditoriaService.registrar_log(
+                db=db,
+                metodo_http=metodo,
+                caminho=caminho,
+                codigo_status=response.status_code,
+                ip_cliente=ip_cliente,
+                usuario_id=usuario_id
             )
-        elif hasattr(response, "body"):
-            body = response.body
-            if isinstance(body, (bytes, bytearray)):
-                payload_resposta = body.decode("utf-8", errors="ignore")
-            else:
-                payload_resposta = str(body)
-        
-        # Limitar tamanho da resposta
-        if len(payload_resposta) > 5000:
-            payload_resposta = payload_resposta[:5000] + "... (truncado)"
+        finally:
+            db.close()
     except Exception as e:
-        payload_resposta = f"Erro ao capturar: {str(e)}"
-    
-    # Salvar log de auditoria
-    try:
-        db: Session = getattr(request.state, "db", None)
-        if db is None:
-            print("[AUDITORIA] AVISO: request.state.db não encontrado!")
-            return response
-        
-        # Obter usuario_id se existir
-        usuario_id = None
-        if hasattr(request.state, "user"):
-            user = getattr(request.state, "user", None)
-            if user:
-                usuario_id = getattr(user, "id", None)
-        
-        log = LogAuditoria(
-            metodo_http=request.method,
-            caminho=request.url.path,
-            payload_requisicao=payload_requisicao,
-            payload_resposta=payload_resposta,
-            codigo_status=response.status_code,
-            ip_cliente=(request.client.host if request.client else None),
-            usuario_id=usuario_id,
-            ocorrido_em=datetime.datetime.utcnow()
-        )
-        
-        db.add(log)
-        db.commit()
-    except Exception as e:
-        print(f"[AUDITORIA] Erro ao salvar log: {e}")
-        traceback.print_exc()
-    
-    return response
-
-
-async def auditoria_middleware_light(request: Request, call_next):
-    """
-    Versão leve da auditoria - não salva payloads (apenas metadados)
-    Útil para serviços com alto volume de requisições
-    """
-    response = await call_next(request)
-    
-    try:
-        db: Session = getattr(request.state, "db", None)
-        if db is None:
-            print("[AUDITORIA LIGHT] AVISO: request.state.db não encontrado!")
-            return response
-        
-        # Obter usuario_id se existir
-        usuario_id = None
-        if hasattr(request.state, "user"):
-            user = getattr(request.state, "user", None)
-            if user:
-                usuario_id = getattr(user, "id", None)
-        
-        log = LogAuditoria(
-            metodo_http=request.method,
-            caminho=request.url.path,
-            payload_requisicao="",  # Não salva payload na versão light
-            payload_resposta="",
-            codigo_status=response.status_code,
-            ip_cliente=(request.client.host if request.client else None),
-            usuario_id=usuario_id,
-            ocorrido_em=datetime.datetime.utcnow()
-        )
-        
-        db.add(log)
-        db.commit()
-    except Exception as e:
-        print(f"[AUDITORIA LIGHT] Erro ao salvar log: {e}")
+        # Log de erro, mas NÃO quebra o fluxo da aplicação
+        print(f"[AUDITORIA] Falha ao registrar: {e}")
         traceback.print_exc()
     
     return response

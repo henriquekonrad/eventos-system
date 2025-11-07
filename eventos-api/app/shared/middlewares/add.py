@@ -1,28 +1,15 @@
-"""
-shared/middlewares/add.py
-Adiciona todos os middlewares comuns aos microsserviços
-"""
 from app.shared.middlewares.cors import add_cors_middleware
-from app.shared.middlewares.database import database_middleware
-from app.shared.middlewares.auditoria import auditoria_middleware, auditoria_middleware_light
+from app.shared.middlewares.auditoria import auditoria_middleware
 from fastapi import FastAPI
 
-
-def add_common_middlewares(app: FastAPI, audit: bool = False, light: bool = False):
+def add_common_middlewares(app: FastAPI, audit: bool = False):
     """
-    Adiciona middlewares comuns a todos os microsserviços:
-    - CORS
-    - Database (sessão do banco)
-    - (Opcional) Auditoria
+    Adiciona middlewares de forma desacoplada.
+    Ordem não importa mais! Cada middleware é independente.
     """
     add_cors_middleware(app)
     
-    app.middleware("http")(database_middleware)
-    
     if audit:
-        if light:
-            app.middleware("http")(auditoria_middleware_light)
-        else:
-            app.middleware("http")(auditoria_middleware)
+        app.middleware("http")(auditoria_middleware)
     
     return app
