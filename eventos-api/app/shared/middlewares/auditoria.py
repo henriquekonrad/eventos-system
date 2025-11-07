@@ -1,9 +1,15 @@
+"""
+shared/middlewares/auditoria.py
+Middleware de auditoria para registrar todas as requisições
+"""
 from fastapi import Request, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import datetime
 import traceback
-import json
+import io
 from app.shared.models.log_auditoria import LogAuditoria
+
 
 async def auditoria_middleware(request: Request, call_next):
     """
@@ -18,6 +24,7 @@ async def auditoria_middleware(request: Request, call_next):
     - IP do cliente
     - ID do usuário (se autenticado)
     """
+    # Capturar payload da requisição
     try:
         raw_req_body = await request.body()
         if raw_req_body:
@@ -27,48 +34,56 @@ async def auditoria_middleware(request: Request, call_next):
                 payload_requisicao = payload_requisicao[:5000] + "... (truncado)"
         else:
             payload_requisicao = ""
-    except Exception:
-        payload_requisicao = ""
+    except Exception as e:
+        payload_requisicao = f"Erro ao capturar: {str(e)}"
     
-    response: Response = await call_next(request)
+    # Processar a requisição
+    response = await call_next(request)
     
+    # Capturar payload da resposta
     payload_resposta = ""
     try:
-        if hasattr(response, "body"):
+        # Para StreamingResponse, precisamos consumir o corpo
+        if isinstance(response, StreamingResponse):
+            response_body = b""
+            async for chunk in response.body_iterator:
+                response_body += chunk
+            
+            payload_resposta = response_body.decode("utf-8", errors="ignore")
+            
+            # Recriar a resposta com o mesmo corpo
+            response = Response(
+                content=response_body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type
+            )
+        elif hasattr(response, "body"):
             body = response.body
             if isinstance(body, (bytes, bytearray)):
                 payload_resposta = body.decode("utf-8", errors="ignore")
             else:
-                try:
-                    payload_resposta = str(body)
-                except Exception:
-                    payload_resposta = ""
-        else:
-            try:
-                content = getattr(response, "content", None)
-                if isinstance(content, (bytes, bytearray)):
-                    payload_resposta = content.decode("utf-8", errors="ignore")
-                else:
-                    payload_resposta = str(content) if content is not None else ""
-            except Exception:
-                payload_resposta = ""
+                payload_resposta = str(body)
         
         # Limitar tamanho da resposta
         if len(payload_resposta) > 5000:
             payload_resposta = payload_resposta[:5000] + "... (truncado)"
-    except Exception:
-        payload_resposta = ""
+    except Exception as e:
+        payload_resposta = f"Erro ao capturar: {str(e)}"
     
+    # Salvar log de auditoria
     try:
         db: Session = getattr(request.state, "db", None)
         if db is None:
+            print("[AUDITORIA] AVISO: request.state.db não encontrado!")
             return response
         
-        # Obter usuario
+        # Obter usuario_id se existir
         usuario_id = None
-        if hasattr(request.state, "user") and getattr(request.state, "user"):
-            u = getattr(request.state, "user")
-            usuario_id = getattr(u, "id", None)
+        if hasattr(request.state, "user"):
+            user = getattr(request.state, "user", None)
+            if user:
+                usuario_id = getattr(user, "id", None)
         
         log = LogAuditoria(
             metodo_http=request.method,
@@ -95,19 +110,20 @@ async def auditoria_middleware_light(request: Request, call_next):
     Versão leve da auditoria - não salva payloads (apenas metadados)
     Útil para serviços com alto volume de requisições
     """
-    response: Response = await call_next(request)
+    response = await call_next(request)
     
     try:
         db: Session = getattr(request.state, "db", None)
         if db is None:
+            print("[AUDITORIA LIGHT] AVISO: request.state.db não encontrado!")
             return response
         
+        # Obter usuario_id se existir
         usuario_id = None
-        if hasattr(request.state, "user") and getattr(request.state, "user"):
-            u = getattr(request.state, "user")
-            usuario_id = getattr(u, "id", None)
-        
-        from shared.models.log_auditoria import LogAuditoria
+        if hasattr(request.state, "user"):
+            user = getattr(request.state, "user", None)
+            if user:
+                usuario_id = getattr(user, "id", None)
         
         log = LogAuditoria(
             metodo_http=request.method,
@@ -124,5 +140,6 @@ async def auditoria_middleware_light(request: Request, call_next):
         db.commit()
     except Exception as e:
         print(f"[AUDITORIA LIGHT] Erro ao salvar log: {e}")
+        traceback.print_exc()
     
     return response
