@@ -16,7 +16,7 @@ from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import require_service_api_key
 
 app = FastAPI(title="Auth Service", version="1.0.0")
-add_common_middlewares(app, audit=True, light=True)
+add_common_middlewares(app, audit=True)
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
