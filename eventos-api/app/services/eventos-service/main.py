@@ -14,6 +14,9 @@ from app.shared.core.security import (
     require_jwt_and_service_key,
     require_service_api_key
 )
+from app.shared.models.inscricao import Inscricao
+from app.shared.models.checkin import Checkin
+from app.shared.models.certificado import Certificado
 
 app = FastAPI(title="Eventos Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
@@ -79,9 +82,6 @@ def estatisticas_evento(
     
     REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    from shared.models.inscricao import Inscricao
-    from shared.models.checkin import Checkin
-    from shared.models.certificado import Certificado
     
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:

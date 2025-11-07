@@ -12,10 +12,6 @@ from app.shared.models.usuario import Usuario
 from app.shared import schemas
 from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import require_roles
-from fastapi.openapi.utils import get_openapi
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-security = HTTPBearer()
 
 app = FastAPI(title="Usuarios Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
