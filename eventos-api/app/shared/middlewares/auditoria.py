@@ -1,7 +1,13 @@
-from fastapi import Request
+"""
+shared/middlewares/auditoria.py
+Middleware de auditoria - versão com captura de payloads
+"""
+from fastapi import Request, Response
+from starlette.responses import StreamingResponse
 from app.shared.helpers.auditoria_helper import AuditoriaService
 from app.shared.core.database import SessionLocal
 import traceback
+
 
 async def auditoria_middleware(request: Request, call_next):
     """
@@ -9,7 +15,8 @@ async def auditoria_middleware(request: Request, call_next):
     
     Responsabilidades:
     1. Capturar metadados da requisição/resposta
-    2. Delegar persistência ao Service Layer
+    2. Capturar payloads (request e response bodies)
+    3. Delegar persistência ao Service Layer
     
     NÃO faz:
     - Gerenciamento de sessão DB (usa sua própria)
@@ -17,7 +24,26 @@ async def auditoria_middleware(request: Request, call_next):
     - Acoplamento com outros middlewares
     """
     
-    # Capturar metadados (não lê body para não consumir stream)
+    # ==========================================
+    # 1. CAPTURAR REQUEST BODY
+    # ==========================================
+    payload_requisicao = ""
+    try:
+        body_bytes = await request.body()
+        if body_bytes:
+            payload_requisicao = body_bytes.decode("utf-8", errors="ignore")
+        
+        # IMPORTANTE: Permitir que o body seja lido novamente pelos endpoints
+        async def receive():
+            return {"type": "http.request", "body": body_bytes}
+        request._receive = receive
+        
+    except Exception as e:
+        payload_requisicao = f"Erro ao capturar: {str(e)}"
+    
+    # ==========================================
+    # 2. CAPTURAR METADADOS
+    # ==========================================
     metodo = request.method
     caminho = request.url.path
     ip_cliente = request.client.host if request.client else None
@@ -27,14 +53,44 @@ async def auditoria_middleware(request: Request, call_next):
     if hasattr(request.state, "user"):
         user = getattr(request.state, "user", None)
         if user:
-            usuario_id = getattr(user, "id", None)
+            usuario_id = getattr(user, "id", None) or user.get("sub")
     
-    # Processar requisição
+    # ==========================================
+    # 3. PROCESSAR REQUISIÇÃO
+    # ==========================================
     response = await call_next(request)
     
-    # Registrar auditoria de forma assíncrona (não bloqueia response)
+    # ==========================================
+    # 4. CAPTURAR RESPONSE BODY
+    # ==========================================
+    payload_resposta = ""
     try:
-        # Cria SUA PRÓPRIA sessão (independente de outros middlewares)
+        # FastAPI retorna StreamingResponse por padrão
+        if isinstance(response, StreamingResponse):
+            response_body = b""
+            
+            # Consumir o stream
+            async for chunk in response.body_iterator:
+                response_body += chunk
+            
+            # Decodificar
+            payload_resposta = response_body.decode("utf-8", errors="ignore")
+            
+            # Recriar a resposta (necessário porque consumimos o stream)
+            response = Response(
+                content=response_body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type
+            )
+        
+    except Exception as e:
+        payload_resposta = f"Erro ao capturar: {str(e)}"
+    
+    # ==========================================
+    # 5. REGISTRAR AUDITORIA
+    # ==========================================
+    try:
         db = SessionLocal()
         try:
             AuditoriaService.registrar_log(
@@ -43,12 +99,13 @@ async def auditoria_middleware(request: Request, call_next):
                 caminho=caminho,
                 codigo_status=response.status_code,
                 ip_cliente=ip_cliente,
-                usuario_id=usuario_id
+                usuario_id=usuario_id,
+                payload_requisicao=payload_requisicao,
+                payload_resposta=payload_resposta
             )
         finally:
             db.close()
     except Exception as e:
-        # Log de erro, mas NÃO quebra o fluxo da aplicação
         print(f"[AUDITORIA] Falha ao registrar: {e}")
         traceback.print_exc()
     
