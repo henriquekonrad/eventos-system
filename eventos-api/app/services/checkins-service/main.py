@@ -19,6 +19,7 @@ from app.shared.core.security import (
     require_jwt_and_service_key,
     require_service_api_key
 )
+from app.shared.models.ingresso import Ingresso
 
 app = FastAPI(title="Checkins Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
