@@ -19,6 +19,7 @@ from app.shared.core.security import (
     require_service_api_key,
     get_current_user_from_token
 )
+from app.shared.models.evento import Evento
 
 app = FastAPI(title="Certificados Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
