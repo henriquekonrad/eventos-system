@@ -22,7 +22,7 @@ pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 3
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 45
 
 
 def criar_token(dados: dict, exp_min: int = ACCESS_TOKEN_EXPIRE_MINUTES):
