@@ -60,23 +60,25 @@ def registrar_checkin(
         )
     
     try:
-        with db.begin():
-            check = Checkin(
-                inscricao_id=inscricao_id,
-                ingresso_id=ingresso_id,
-                usuario_id=usuario_id,
-                ocorrido_em=datetime.datetime.utcnow()
-            )
-            db.add(check)
-            
-            inscr.sincronizado = False
-            db.add(inscr)
-            
+        check = Checkin(
+            inscricao_id=inscricao_id,
+            ingresso_id=ingresso_id,
+            usuario_id=usuario_id,
+            ocorrido_em=datetime.datetime.utcnow()
+        )
+        db.add(check)
+
+        inscr.sincronizado = False
+        db.add(inscr)
+
+        db.commit()
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao registrar check-in: {e}"
         )
+
     
     return {
         "id": str(check.id),
@@ -113,62 +115,62 @@ def checkin_rapido(
         raise HTTPException(status_code=404, detail="Evento não encontrado")
     
     try:
-        with db.begin():
-            user = db.query(Usuario).filter(Usuario.email == email).first()
-            senha_temp = None
-            
-            if not user:
-                senha_temp = "temp_" + secrets.token_hex(4)
-                user = Usuario(
-                    nome=nome,
-                    email=email,
-                    cpf=cpf,
-                    senha_hash=pwd.hash(senha_temp),
-                    papel="rapido",
-                    ativo=True,
-                )
-                db.add(user)
-                db.flush()
-            
-            inscr_existente = db.query(Inscricao).filter(
-                Inscricao.evento_id == evento_id,
-                Inscricao.usuario_id == user.id
-            ).first()
-            
-            if inscr_existente:
-                inscr = inscr_existente
-            else:
-                inscr = Inscricao(
-                    evento_id=evento_id,
-                    usuario_id=user.id,
-                    inscricao_rapida=True,
-                    nome_rapido=nome,
-                    cpf_rapido=cpf,
-                    email_rapido=email,
-                    status="ativa",
-                    sincronizado=False
-                )
-                db.add(inscr)
-                db.flush()
-            
-            check_existente = db.query(Checkin).filter(
-                Checkin.inscricao_id == inscr.id
-            ).first()
-            
-            if check_existente:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Check-in já foi realizado para esta inscrição"
-                )
-            
-            check = Checkin(
-                inscricao_id=inscr.id,
-                ingresso_id=ingresso_id or uuid4(),
-                usuario_id=user.id,
-                ocorrido_em=datetime.datetime.utcnow()
+        user = db.query(Usuario).filter(Usuario.email == email).first()
+        senha_temp = None
+        
+        if not user:
+            senha_temp = "temp_" + secrets.token_hex(4)
+            user = Usuario(
+                nome=nome,
+                email=email,
+                cpf=cpf,
+                senha_hash=pwd.hash(senha_temp),
+                papel="rapido",
+                ativo=True,
             )
-            db.add(check)
-            
+            db.add(user)
+            db.flush()
+        
+        inscr_existente = db.query(Inscricao).filter(
+            Inscricao.evento_id == evento_id,
+            Inscricao.usuario_id == user.id
+        ).first()
+        
+        if inscr_existente:
+            inscr = inscr_existente
+        else:
+            inscr = Inscricao(
+                evento_id=evento_id,
+                usuario_id=user.id,
+                inscricao_rapida=True,
+                nome_rapido=nome,
+                cpf_rapido=cpf,
+                email_rapido=email,
+                status="ativa",
+                sincronizado=False
+            )
+            db.add(inscr)
+            db.flush()
+        
+        check_existente = db.query(Checkin).filter(
+            Checkin.inscricao_id == inscr.id
+        ).first()
+        
+        if check_existente:
+            raise HTTPException(
+                status_code=400,
+                detail="Check-in já foi realizado para esta inscrição"
+            )
+        
+        check = Checkin(
+            inscricao_id=inscr.id,
+            ingresso_id=ingresso_id or uuid4(),
+            usuario_id=user.id,
+            ocorrido_em=datetime.datetime.utcnow()
+        )
+        db.add(check)
+        db.commit()
+        
     except HTTPException:
         raise
     except Exception as e:
