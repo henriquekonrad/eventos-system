@@ -126,8 +126,7 @@ def checkin_rapido(
                 email=email,
                 cpf=cpf,
                 senha_hash=pwd.hash(senha_temp),
-                papel="rapido",
-                ativo=True,
+                papel="rapido"
             )
             db.add(user)
             db.flush()
