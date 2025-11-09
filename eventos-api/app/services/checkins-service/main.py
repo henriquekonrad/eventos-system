@@ -2,6 +2,7 @@
 Microsserviço de Check-ins
 Porta: 8006
 """
+import hashlib
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
@@ -151,6 +152,31 @@ def checkin_rapido(
             )
             db.add(inscr)
             db.flush()
+
+        if not ingresso_id:
+            # Verificar se já existe ingresso para essa inscrição
+            ingresso_existente = db.query(Ingresso).filter(
+                Ingresso.inscricao_id == inscr.id
+            ).first()
+            
+            if ingresso_existente:
+                ingresso_id = ingresso_existente.id
+            else:
+                # Criar novo ingresso
+                codigo = f"ING-{uuid4().hex[:8].upper()}"
+                token_qr = hashlib.sha256(f"{codigo}-{inscr.id}".encode()).hexdigest()
+                
+                novo_ingresso = Ingresso(
+                    inscricao_id=inscr.id,
+                    evento_id=evento_id,
+                    codigo_ingresso=codigo,
+                    token_qr=token_qr,
+                    status="emitido",
+                    emitido_em=datetime.datetime.utcnow()
+                )
+                db.add(novo_ingresso)
+                db.flush()
+                ingresso_id = novo_ingresso.id
         
         check_existente = db.query(Checkin).filter(
             Checkin.inscricao_id == inscr.id
@@ -164,7 +190,7 @@ def checkin_rapido(
         
         check = Checkin(
             inscricao_id=inscr.id,
-            ingresso_id=ingresso_id or uuid4(),
+            ingresso_id=ingresso_id,
             usuario_id=user.id,
             ocorrido_em=datetime.datetime.utcnow()
         )
