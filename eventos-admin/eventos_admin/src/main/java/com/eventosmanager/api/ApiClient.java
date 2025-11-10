@@ -2,6 +2,7 @@ package com.eventosmanager.api;
 
 import java.io.IOException;
 
+import com.eventosmanager.api.api_utils.ServiceType;
 import com.eventosmanager.config.AppConfig;
 
 import okhttp3.Interceptor;
@@ -11,34 +12,38 @@ import okhttp3.Response;
 
 public class ApiClient {
 
-    private static final String API_KEY = AppConfig.get("API_KEY");
+    private final OkHttpClient client;
+    private final String apiKey;
     private static String userAuthToken = null;
 
-    private static final OkHttpClient client = new OkHttpClient.Builder()
-            .addInterceptor(new Interceptor() {
-                @Override
-                public Response intercept(Chain chain) throws IOException {
-                    Request original = chain.request();
-                    Request.Builder builder = original.newBuilder()
-                            .header("Accept", "application/json");
+    public ApiClient(ServiceType service) {
+        this.apiKey = AppConfig.getApiKey(service);
 
-                    // header para api key (nome acordado com a API backend)
-                    if (API_KEY != null && !API_KEY.trim().isEmpty()) {
-                        builder.header("x-api-key", API_KEY);
+        this.client = new OkHttpClient.Builder()
+                .addInterceptor(new Interceptor() {
+                    @Override
+                    public Response intercept(Chain chain) throws IOException {
+                        Request original = chain.request();
+                        Request.Builder builder = original.newBuilder()
+                                .header("Accept", "application/json");
+
+                        // adiciona a API key específica do serviço
+                        if (apiKey != null && !apiKey.trim().isEmpty()) {
+                            builder.header("x-api-key", apiKey);
+                        }
+
+                        // adiciona token JWT do usuário se existir
+                        if (userAuthToken != null && !userAuthToken.trim().isEmpty()) {
+                            builder.header("Authorization", "Bearer " + userAuthToken);
+                        }
+
+                        return chain.proceed(builder.build());
                     }
+                })
+                .build();
+    }
 
-                    // se existir token de usuário (JWT), adiciona Authorization Bearer
-                    if (userAuthToken != null && !userAuthToken.trim().isEmpty()) {
-                        builder.header("Authorization", "Bearer " + userAuthToken);
-                    }
-
-                    Request requestWithHeaders = builder.build();
-                    return chain.proceed(requestWithHeaders);
-                }
-            })
-            .build();
-
-    public static OkHttpClient getClient() {
+    public OkHttpClient getClient() {
         return client;
     }
 
@@ -48,5 +53,9 @@ public class ApiClient {
 
     public static void clearUserAuthToken() {
         userAuthToken = null;
+    }
+
+    public static String getUserAuthToken() {
+        return userAuthToken;
     }
 }
