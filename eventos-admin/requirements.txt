@@ -1,1 +1,8 @@
-t
+customtkinter
+requests
+qrcode
+Pillow
+pyshorteners 
+python-dotenv
+sqlalchemy
+apscheduler
