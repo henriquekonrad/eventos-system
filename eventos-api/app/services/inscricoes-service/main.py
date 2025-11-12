@@ -216,7 +216,7 @@ def estatisticas_inscricoes(
 
 @app.get("/evento/{evento_id}/inscritos")
 def listar_inscritos_evento(
-    evento_id: UUID = Path(..., description="ID do evento"),
+    evento_id: UUID,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "atendente", "administrador"))
 ):
