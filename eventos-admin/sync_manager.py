@@ -280,32 +280,12 @@ def process_pending_smart():
             if r.status_code >= 500:
                 response_text = r.text.lower()
                 
-                # CPF duplicado no check-in rápido - Erro permanente
-                if "duplicate key" in response_text and "cpf" in response_text:
-                    print(f"[SYNC] ⚠️ CPF já cadastrado no sistema - REMOVENDO da fila")
-                    print(f"[SYNC] Detalhe: Usuário já existe, use check-in normal")
-                    
-                    # Marca check-in como sincronizado (pessoa pode entrar)
-                    if p.get('related_inscricao_id'):
-                        from db import marcar_checkin_sincronizado
-                        marcar_checkin_sincronizado(p['related_inscricao_id'])
-                    
+                # CPF/Email duplicado no check-in rápido - Erro permanente (não deveria acontecer)
+                if "duplicate key" in response_text and ("cpf" in response_text or "email" in response_text):
+                    print(f"[SYNC] ⚠️ CPF/Email já cadastrado - REMOVENDO da fila")
+                    print(f"[SYNC] Detalhe: Erro de validação - deveria ter sido bloqueado na UI")
                     delete_pending_request(p["id"])
-                    ja_feito += 1
-                    continue
-                
-                # Email duplicado no check-in rápido - Erro permanente
-                if "duplicate key" in response_text and "email" in response_text:
-                    print(f"[SYNC] ⚠️ Email já cadastrado no sistema - REMOVENDO da fila")
-                    print(f"[SYNC] Detalhe: Usuário já existe, use check-in normal")
-                    
-                    # Marca check-in como sincronizado (pessoa pode entrar)
-                    if p.get('related_inscricao_id'):
-                        from db import marcar_checkin_sincronizado
-                        marcar_checkin_sincronizado(p['related_inscricao_id'])
-                    
-                    delete_pending_request(p["id"])
-                    ja_feito += 1
+                    removidos += 1
                     continue
                 
                 # Outros erros 500 - Mantém na fila (erro temporário do servidor)

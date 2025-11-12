@@ -219,9 +219,14 @@ OPÇÕES:
         popup = ctk.CTkToplevel(self)
         popup.title("Inscrição Rápida - Pessoa SEM cadastro")
         popup.geometry("500x380")
-        popup.attributes('-topmost', True)  # Traz janela pra frente
+        
+        # Aguarda a janela ser criada antes de configurar topmost e grab
+        popup.update_idletasks()
+        popup.attributes('-topmost', True)
         popup.focus_force()
-        popup.grab_set()  # Modal
+        
+        # Aguarda mais um pouco antes do grab_set
+        popup.after(100, lambda: popup.grab_set())
         
         # Título explicativo
         titulo = ctk.CTkLabel(
