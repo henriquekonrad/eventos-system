@@ -214,6 +214,11 @@ def process_pending_smart():
             
             # SUCESSO
             if r.status_code in [200, 201, 204]:
+                # Marca check-in como sincronizado se tiver inscricao_id relacionado
+                if p.get('related_inscricao_id'):
+                    from db import marcar_checkin_sincronizado
+                    marcar_checkin_sincronizado(p['related_inscricao_id'])
+                
                 delete_pending_request(p["id"])
                 sucesso += 1
                 print(f"[SYNC] ✓ Sincronizado com sucesso!")

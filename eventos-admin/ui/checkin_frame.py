@@ -5,7 +5,7 @@ from tkinter import messagebox
 import os
 from db import (get_inscrito_by_cpf, add_inscrito_local, add_checkin_local, 
                 add_pending, list_pending_requests, delete_pending_request,
-                checkin_ja_existe_local)
+                checkin_ja_existe_local, checkin_ja_existe_por_cpf)
 from api_client import is_online
 import uuid
 
@@ -143,9 +143,20 @@ class CheckinFrame(ctk.CTkFrame):
         inscr = get_inscrito_by_cpf(cpf, evento_id=self.current_evento_id)
         
         if inscr:
-            # VERIFICA SE JÁ TEM CHECK-IN LOCAL (não sincronizado ainda)
-            if checkin_ja_existe_local(inscr['inscricao_id']):
-                info = f"""⚠️ CHECK-IN JÁ REGISTRADO (LOCALMENTE)
+            # VERIFICA SE JÁ TEM CHECK-IN LOCAL
+            checkin_status = checkin_ja_existe_local(inscr['inscricao_id'])
+            if checkin_status:
+                if checkin_status['sincronizado']:
+                    info = f"""✓ CHECK-IN JÁ REGISTRADO NO SERVIDOR
+
+Nome: {inscr['nome']}
+CPF: {inscr['cpf']}
+Email: {inscr['email']}
+
+✓ Esta pessoa JÁ FEZ CHECK-IN (confirmado no servidor)
+→ PODE ENTRAR NO EVENTO"""
+                else:
+                    info = f"""⚠️ CHECK-IN JÁ REGISTRADO (LOCALMENTE)
 
 Nome: {inscr['nome']}
 CPF: {inscr['cpf']}
@@ -260,16 +271,25 @@ OPÇÕES:
             local_id = str(uuid.uuid4())
             
             # VERIFICA SE JÁ EXISTE CHECK-IN LOCAL PARA ESTE CPF
-            inscr_existente = get_inscrito_by_cpf(cpf, evento_id=evento_id)
-            if inscr_existente and checkin_ja_existe_local(inscr_existente['inscricao_id']):
+            checkin_status = checkin_ja_existe_por_cpf(cpf, evento_id)
+            if checkin_status:
                 popup.destroy()
-                self.update_info(f"""⚠️ CHECK-IN JÁ REGISTRADO
+                if checkin_status['sincronizado']:
+                    self.update_info(f"""✓ CHECK-IN JÁ REGISTRADO NO SERVIDOR
 
 CPF: {cpf}
-Nome: {inscr_existente['nome']}
+
+✓ Esta pessoa JÁ FEZ CHECK-IN (confirmado no servidor)
+→ PODE ENTRAR NO EVENTO""")
+                else:
+                    self.update_info(f"""⚠️ CHECK-IN JÁ REGISTRADO (LOCALMENTE)
+
+CPF: {cpf}
 
 ✓ Esta pessoa JÁ FEZ CHECK-IN (aguardando sincronização)
-→ PODE ENTRAR NO EVENTO""")
+→ PODE ENTRAR NO EVENTO
+
+Sincronize as pendências para enviar ao servidor.""")
                 return
             
             # Salva inscrito localmente como "rápido"
@@ -283,7 +303,7 @@ Nome: {inscr_existente['nome']}
             # USA ENDPOINT /rapido - Cria TUDO: usuário temporário + inscrição + ingresso + check-in
             checkin_params = f"evento_id={evento_id}&nome={nome}&cpf={cpf}&email={email}"
             checkin_url = f"http://177.44.248.122:8006/rapido?{checkin_params}"
-            add_pending("POST", checkin_url, {}, headers)
+            add_pending("POST", checkin_url, {}, headers, related_inscricao_id=local_id, related_cpf=cpf)
             
             # Registra check-in local
             add_checkin_local(local_id, None, None, evento_id, tipo="rapida", sincronizado=0)
@@ -335,14 +355,30 @@ Status: {'Enfileirado para sincronização' if not is_online() else 'Será sincr
         inscricao_id = self.found_inscricao.get("inscricao_id")
         
         # VERIFICA SE JÁ TEM CHECK-IN LOCAL
-        if checkin_ja_existe_local(inscricao_id):
-            self.update_info(f"""⚠️ CHECK-IN JÁ REGISTRADO
+        checkin_status = checkin_ja_existe_local(inscricao_id)
+        if checkin_status:
+            nome = self.found_inscricao.get('nome')
+            cpf = self.found_inscricao.get('cpf')
+            
+            if checkin_status['sincronizado']:
+                self.update_info(f"""✓ CHECK-IN JÁ REGISTRADO NO SERVIDOR
 
-Nome: {self.found_inscricao.get('nome')}
-CPF: {self.found_inscricao.get('cpf')}
+Nome: {nome}
+CPF: {cpf}
+
+✓ Esta pessoa JÁ FEZ CHECK-IN (confirmado no servidor)
+→ PODE ENTRAR NO EVENTO""")
+            else:
+                self.update_info(f"""⚠️ CHECK-IN JÁ REGISTRADO (LOCALMENTE)
+
+Nome: {nome}
+CPF: {cpf}
 
 ✓ Esta pessoa JÁ FEZ CHECK-IN (aguardando sincronização)
-→ PODE ENTRAR NO EVENTO""")
+→ PODE ENTRAR NO EVENTO
+
+Sincronize as pendências para enviar ao servidor.""")
+            
             self.checkin_btn.configure(state="disabled")
             return
         
@@ -392,7 +428,7 @@ CPF: {self.found_inscricao.get('cpf')}
             print(f"[CHECKIN] Usando endpoint /rapido como FALLBACK")
         
         # Adiciona à fila
-        add_pending("POST", url, {}, headers)
+        add_pending("POST", url, {}, headers, related_inscricao_id=inscricao_id, related_cpf=cpf)
         
         # Registra localmente
         add_checkin_local(inscricao_id, ingresso_id, usuario_id, evento_id, tipo="normal", sincronizado=0)
@@ -575,20 +611,43 @@ CPF: {cpf}
         return "\n".join(info_parts) if info_parts else "Detalhes da operação"
     
     def remover_pendente(self, request_id, popup_window):
-        """Remove uma requisição pendente após confirmação"""
+        """Remove uma requisição pendente após confirmação E LIMPA DADOS RELACIONADOS"""
         resposta = messagebox.askyesno(
             "Confirmar Remoção",
             "Tem certeza que deseja remover esta operação?\n\n"
             "⚠️ Ela não será enviada ao servidor!\n"
+            "Os dados locais relacionados também serão removidos.\n\n"
             "Use apenas se foi registrada por engano.",
             parent=popup_window
         )
         
         if resposta:
-            delete_pending_request(request_id)
+            from db import delete_checkin_local, delete_inscrito_local
+            
+            # Remove a pendência e obtém informações relacionadas
+            info = delete_pending_request(request_id)
+            
+            # LIMPA DADOS LOCAIS RELACIONADOS
+            if info:
+                if info['inscricao_id']:
+                    # Remove check-in local
+                    delete_checkin_local(info['inscricao_id'])
+                    
+                    # Se for inscrição rápida (UUID local), remove também o inscrito
+                    # (UUID local tem formato completo, inscrições do servidor não)
+                    try:
+                        import uuid
+                        uuid.UUID(info['inscricao_id'])
+                        # É UUID válido, provavelmente é inscrição local rápida
+                        delete_inscrito_local(info['inscricao_id'])
+                        print(f"[UI] Inscrito local {info['inscricao_id']} também removido")
+                    except:
+                        # Não é UUID ou erro, não remove inscrito
+                        pass
+            
             popup_window.destroy()
             self.mostrar_pendentes()  # Reabre com lista atualizada
-            self.update_info("✓ Operação removida da fila de sincronização.")
+            self.update_info("✓ Operação removida da fila de sincronização.\n\n✓ Dados locais relacionados também foram limpos.\n\nAgora você pode registrar o check-in novamente.")
 
     def sync_now(self):
         """Executa sincronização de pendentes com tratamento inteligente de erros"""
