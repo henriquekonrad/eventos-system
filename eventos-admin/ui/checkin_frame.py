@@ -622,28 +622,25 @@ CPF: {cpf}
         )
         
         if resposta:
-            from db import delete_checkin_local, delete_inscrito_local
+            from db import delete_checkin_local, delete_inscrito_local, get_inscrito_by_id
             
             # Remove a pendência e obtém informações relacionadas
             info = delete_pending_request(request_id)
             
             # LIMPA DADOS LOCAIS RELACIONADOS
-            if info:
-                if info['inscricao_id']:
-                    # Remove check-in local
-                    delete_checkin_local(info['inscricao_id'])
-                    
-                    # Se for inscrição rápida (UUID local), remove também o inscrito
-                    # (UUID local tem formato completo, inscrições do servidor não)
-                    try:
-                        import uuid
-                        uuid.UUID(info['inscricao_id'])
-                        # É UUID válido, provavelmente é inscrição local rápida
-                        delete_inscrito_local(info['inscricao_id'])
-                        print(f"[UI] Inscrito local {info['inscricao_id']} também removido")
-                    except:
-                        # Não é UUID ou erro, não remove inscrito
-                        pass
+            if info and info['inscricao_id']:
+                # Remove check-in local
+                delete_checkin_local(info['inscricao_id'])
+                
+                # Verifica se é inscrição LOCAL (não sincronizada)
+                inscrito = get_inscrito_by_id(info['inscricao_id'])
+                if inscrito and inscrito['sincronizado'] == 0:
+                    # É inscrição local/rápida - pode remover
+                    delete_inscrito_local(info['inscricao_id'])
+                    print(f"[UI] Inscrito local {info['inscricao_id']} também removido")
+                else:
+                    # É inscrição do servidor - NÃO remove!
+                    print(f"[UI] Inscrito {info['inscricao_id']} é do servidor, mantendo")
             
             popup_window.destroy()
             self.mostrar_pendentes()  # Reabre com lista atualizada

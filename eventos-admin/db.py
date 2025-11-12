@@ -141,6 +141,26 @@ def get_inscrito_by_cpf(cpf, evento_id=None):
         "sincronizado": row[5]
     }
 
+def get_inscrito_by_id(inscricao_id):
+    """
+    Busca inscrito por ID da inscrição
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT inscricao_id,evento_id,nome,cpf,email,sincronizado FROM inscritos WHERE inscricao_id=?", (inscricao_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "inscricao_id": row[0],
+        "evento_id": row[1],
+        "nome": row[2],
+        "cpf": row[3],
+        "email": row[4],
+        "sincronizado": row[5]
+    }
+
 def delete_inscrito_local(inscricao_id):
     """Remove um inscrito local (usado quando removemos pendência de inscrição rápida)"""
     conn = sqlite3.connect(DB_PATH)

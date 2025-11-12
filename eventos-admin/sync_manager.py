@@ -232,6 +232,12 @@ def process_pending_smart():
                 # Check-in já realizado - OK, pessoa pode entrar!
                 if "já foi realizado" in response_text or "já registrado" in response_text:
                     print(f"[SYNC] ℹ️ Check-in já foi realizado - REMOVENDO da fila")
+                    
+                    # Marca como sincronizado se tiver inscricao_id
+                    if p.get('related_inscricao_id'):
+                        from db import marcar_checkin_sincronizado
+                        marcar_checkin_sincronizado(p['related_inscricao_id'])
+                    
                     delete_pending_request(p["id"])
                     ja_feito += 1
                     continue
@@ -270,8 +276,39 @@ def process_pending_smart():
                 falhas += 1
                 continue
             
-            # ERROS 5xx - Mantém na fila (erro do servidor)
+            # ERROS 5xx - Analisar se é erro permanente ou temporário
             if r.status_code >= 500:
+                response_text = r.text.lower()
+                
+                # CPF duplicado no check-in rápido - Erro permanente
+                if "duplicate key" in response_text and "cpf" in response_text:
+                    print(f"[SYNC] ⚠️ CPF já cadastrado no sistema - REMOVENDO da fila")
+                    print(f"[SYNC] Detalhe: Usuário já existe, use check-in normal")
+                    
+                    # Marca check-in como sincronizado (pessoa pode entrar)
+                    if p.get('related_inscricao_id'):
+                        from db import marcar_checkin_sincronizado
+                        marcar_checkin_sincronizado(p['related_inscricao_id'])
+                    
+                    delete_pending_request(p["id"])
+                    ja_feito += 1
+                    continue
+                
+                # Email duplicado no check-in rápido - Erro permanente
+                if "duplicate key" in response_text and "email" in response_text:
+                    print(f"[SYNC] ⚠️ Email já cadastrado no sistema - REMOVENDO da fila")
+                    print(f"[SYNC] Detalhe: Usuário já existe, use check-in normal")
+                    
+                    # Marca check-in como sincronizado (pessoa pode entrar)
+                    if p.get('related_inscricao_id'):
+                        from db import marcar_checkin_sincronizado
+                        marcar_checkin_sincronizado(p['related_inscricao_id'])
+                    
+                    delete_pending_request(p["id"])
+                    ja_feito += 1
+                    continue
+                
+                # Outros erros 500 - Mantém na fila (erro temporário do servidor)
                 print(f"[SYNC] ✗ Erro do servidor ({r.status_code}) - MANTENDO na fila")
                 falhas += 1
                 continue
