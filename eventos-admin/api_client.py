@@ -18,24 +18,27 @@ BASE_CERT = "http://177.44.248.122:8007"
 TIMEOUT = 6
 TOKEN = None
 
-def _request(method, url, json_body=None, params=None):
+def _request(method, url, json_body=None, params=None, api_key_env=None):
     headers = auth_header()
-    headers["x-api-key"] = os.getenv("EVENTOS_API_KEY")
+    if api_key_env:
+        headers["x-api-key"] = os.getenv(api_key_env)
+
     try:
-        print(f"[REQUEST] {method} {url}")
-        if json_body:
-            print(f"[REQUEST] Body: {json_body}")
-        if params:
-            print(f"[REQUEST] Params: {params}")
-        r = requests.request(method, url, json=json_body, params=params, headers=headers, timeout=6)
-        print(f"[REQUEST] Status: {r.status_code}")
-        print(f"[REQUEST] Response: {r.text}")
+        r = requests.request(method, url, json=json_body, params=params, headers=headers, timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
-    except requests.RequestException as e:
-        print(f"[REQUEST] Offline ou erro: {e}")
+    except requests.RequestException:
         from db import add_pending
-        add_pending(method, url, json.dumps(json_body) if json_body else "", headers=json.dumps(headers))
+        # salva os parâmetros e headers para reconstruir depois
+        data = {
+            "method": method,
+            "url": url,
+            "body": json_body,
+            "params": params,
+            "headers": headers
+        }
+        print(f"[OFFLINE] Salvando requisição pendente: {url}")
+        add_pending(**data)
         return None
 
 
@@ -79,20 +82,6 @@ def is_online():
         print(f"[is_online] Erro ao testar conexão: {e}")
         return False
 
-
-def _request(method, url, json_body=None, params=None):
-    headers = auth_header()
-    try:
-        r = requests.request(method, url, json=json_body, params=params, headers=headers, timeout=TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    except requests.RequestException:
-        # Se offline, salva na tabela pending
-        body_text = json.dumps(json_body) if json_body else ""
-        add_pending(method, url, body_text, headers=json.dumps(headers))
-        print(f"Offline: requisição salva -> {url}")
-        return None
-
 # -----------------------------
 # Funções da API usando _request
 # -----------------------------
@@ -111,8 +100,13 @@ def inscricao_rapida(evento_id, nome, cpf, email):
 
 def registrar_checkin(inscricao_id, ingresso_id, usuario_id):
     url = f"{BASE_CHECKINS}/"
-    params = {"inscricao_id": inscricao_id, "ingresso_id": ingresso_id, "usuario_id": usuario_id}
-    return _request("POST", url, params=params)
+    params = {
+        "inscricao_id": inscricao_id,
+        "ingresso_id": ingresso_id,
+        "usuario_id": usuario_id
+    }
+    return _request("POST", url, params=params, api_key_env="CHECKINS_API_KEY")
+
 
 def emitir_certificado(inscricao_id, evento_id):
     url = f"{BASE_CERT}/emitir"
