@@ -155,6 +155,18 @@ def add_checkin_local(inscricao_id, ingresso_id, usuario_id, evento_id, tipo="no
     conn.close()
     print(f"[DB] Check-in salvo: {inscricao_id} (tipo: {tipo})")
 
+def checkin_ja_existe_local(inscricao_id):
+    """
+    Verifica se já existe check-in local (não sincronizado) para uma inscrição.
+    Retorna True se já existe, False caso contrário.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM checkins WHERE inscricao_id=?", (inscricao_id,))
+    count = c.fetchone()[0]
+    conn.close()
+    return count > 0
+
 def list_pending_requests():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()

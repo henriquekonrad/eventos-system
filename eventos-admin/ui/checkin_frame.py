@@ -1,8 +1,11 @@
 # ui/checkin_frame.py
 import customtkinter as ctk
+import tkinter as tk
+from tkinter import messagebox
 import os
 from db import (get_inscrito_by_cpf, add_inscrito_local, add_checkin_local, 
-                add_pending, list_pending_requests)
+                add_pending, list_pending_requests, delete_pending_request,
+                checkin_ja_existe_local)
 from api_client import is_online
 import uuid
 
@@ -140,6 +143,23 @@ class CheckinFrame(ctk.CTkFrame):
         inscr = get_inscrito_by_cpf(cpf, evento_id=self.current_evento_id)
         
         if inscr:
+            # VERIFICA SE JÁ TEM CHECK-IN LOCAL (não sincronizado ainda)
+            if checkin_ja_existe_local(inscr['inscricao_id']):
+                info = f"""⚠️ CHECK-IN JÁ REGISTRADO (LOCALMENTE)
+
+Nome: {inscr['nome']}
+CPF: {inscr['cpf']}
+Email: {inscr['email']}
+
+✓ Esta pessoa JÁ FEZ CHECK-IN (aguardando sincronização)
+→ PODE ENTRAR NO EVENTO
+
+Sincronize as pendências para enviar ao servidor."""
+                self.update_info(info)
+                self.checkin_btn.configure(state="disabled")
+                self.found_inscricao = None
+                return
+            
             self.found_inscricao = inscr
             info = f"""✓ PARTICIPANTE ENCONTRADO (JÁ TEM INSCRIÇÃO)
 
@@ -188,6 +208,8 @@ OPÇÕES:
         popup = ctk.CTkToplevel(self)
         popup.title("Inscrição Rápida - Pessoa SEM cadastro")
         popup.geometry("500x380")
+        popup.attributes('-topmost', True)  # Traz janela pra frente
+        popup.focus_force()
         popup.grab_set()  # Modal
         
         # Título explicativo
@@ -237,6 +259,19 @@ OPÇÕES:
             # Cria ID temporário local
             local_id = str(uuid.uuid4())
             
+            # VERIFICA SE JÁ EXISTE CHECK-IN LOCAL PARA ESTE CPF
+            inscr_existente = get_inscrito_by_cpf(cpf, evento_id=evento_id)
+            if inscr_existente and checkin_ja_existe_local(inscr_existente['inscricao_id']):
+                popup.destroy()
+                self.update_info(f"""⚠️ CHECK-IN JÁ REGISTRADO
+
+CPF: {cpf}
+Nome: {inscr_existente['nome']}
+
+✓ Esta pessoa JÁ FEZ CHECK-IN (aguardando sincronização)
+→ PODE ENTRAR NO EVENTO""")
+                return
+            
             # Salva inscrito localmente como "rápido"
             add_inscrito_local(local_id, evento_id, nome, cpf, email, sincronizado=0)
             
@@ -266,10 +301,10 @@ ID Local: {local_id}
 
 Status: {'Enfileirado para sincronização' if not is_online() else 'Será sincronizado em breve'}
 
-⚠️ Esta é uma inscrição RÁPIDA (usuário temporário)
-   A pessoa pode completar o cadastro depois no site.
+→ PESSOA PODE ENTRAR NO EVENTO
 
-Os dados serão enviados ao servidor na próxima sincronização."""
+⚠️ Esta é uma inscrição RÁPIDA (usuário temporário)
+   A pessoa pode completar o cadastro depois no site."""
             
             self.update_info(info)
             
@@ -298,6 +333,19 @@ Os dados serão enviados ao servidor na próxima sincronização."""
             return
         
         inscricao_id = self.found_inscricao.get("inscricao_id")
+        
+        # VERIFICA SE JÁ TEM CHECK-IN LOCAL
+        if checkin_ja_existe_local(inscricao_id):
+            self.update_info(f"""⚠️ CHECK-IN JÁ REGISTRADO
+
+Nome: {self.found_inscricao.get('nome')}
+CPF: {self.found_inscricao.get('cpf')}
+
+✓ Esta pessoa JÁ FEZ CHECK-IN (aguardando sincronização)
+→ PODE ENTRAR NO EVENTO""")
+            self.checkin_btn.configure(state="disabled")
+            return
+        
         evento_id = self.found_inscricao.get("evento_id") or self.current_evento_id
         nome = self.found_inscricao.get("nome")
         cpf = self.found_inscricao.get("cpf")
@@ -339,10 +387,6 @@ Os dados serão enviados ao servidor na próxima sincronização."""
             print(f"[CHECKIN] Usando endpoint NORMAL com IDs reais")
         else:
             # NÃO TEM DADOS COMPLETOS - Usa endpoint /rapido como fallback
-            # Isso pode acontecer se:
-            # - Estiver offline
-            # - Ingresso/usuário ainda não foram criados no servidor
-            # - Endpoint de busca não existir
             params = f"evento_id={evento_id}&nome={nome}&cpf={cpf}&email={email}"
             url = f"http://177.44.248.122:8006/rapido?{params}"
             print(f"[CHECKIN] Usando endpoint /rapido como FALLBACK")
@@ -361,8 +405,8 @@ Os dados serão enviados ao servidor na próxima sincronização."""
 Nome: {nome}
 CPF: {cpf}
 Inscrição ID: {inscricao_id}
-Ingresso ID: {ingresso_id or 'Será criado no servidor'}
-Usuário ID: {usuario_id or 'Será buscado no servidor'}
+
+→ PESSOA PODE ENTRAR NO EVENTO
 
 O check-in foi registrado e será enviado ao servidor.""")
         else:
@@ -371,8 +415,9 @@ O check-in foi registrado e será enviado ao servidor.""")
 Nome: {nome}
 CPF: {cpf}
 
-⚠️ Modo offline - O check-in será enviado quando houver conexão.
-Use "Sincronizar Pendentes" quando voltar online.""")
+→ PESSOA PODE ENTRAR NO EVENTO
+
+⚠️ Modo offline - O check-in será enviado quando houver conexão.""")
         
         # Limpa estado
         self.found_inscricao = None
@@ -380,49 +425,208 @@ Use "Sincronizar Pendentes" quando voltar online.""")
         self.cpf_var.set("")
 
     def mostrar_pendentes(self):
-        """Mostra lista de requisições pendentes"""
+        """Mostra lista de requisições pendentes com interface amigável"""
         pend = list_pending_requests()
         
-        if not pend:
-            text = "✓ Nenhuma requisição pendente!\n\nTodas as operações foram sincronizadas."
-        else:
-            text = f"📋 REQUISIÇÕES PENDENTES ({len(pend)})\n\n"
-            for p in pend:
-                text += f"ID: {p['id']}\n"
-                text += f"Método: {p['method']}\n"
-                text += f"URL: {p['url']}\n"
-                text += f"Criado em: {p['created_at']}\n"
-                text += "-" * 50 + "\n\n"
-        
         popup = ctk.CTkToplevel(self)
-        popup.title("Requisições Pendentes")
-        popup.geometry("700x400")
+        popup.title("Requisições Aguardando Sincronização")
+        popup.geometry("900x550")
+        popup.attributes('-topmost', True)  # Traz janela pra frente
+        popup.focus_force()
         
-        textbox = ctk.CTkTextbox(popup)
-        textbox.pack(fill="both", expand=True, padx=10, pady=10)
-        textbox.insert("0.0", text)
-        textbox.configure(state="disabled")
+        # Frame principal
+        main_frame = ctk.CTkFrame(popup)
+        main_frame.pack(fill="both", expand=True, padx=15, pady=15)
         
-        btn = ctk.CTkButton(popup, text="Fechar", command=popup.destroy)
-        btn.pack(pady=10)
+        if not pend:
+            # Sem pendências
+            icon_label = ctk.CTkLabel(
+                main_frame, 
+                text="✓", 
+                font=("Arial", 80),
+                text_color="green"
+            )
+            icon_label.pack(pady=50)
+            
+            msg_label = ctk.CTkLabel(
+                main_frame,
+                text="Nenhuma operação pendente!",
+                font=("Arial", 18, "bold")
+            )
+            msg_label.pack()
+            
+            desc_label = ctk.CTkLabel(
+                main_frame,
+                text="Todas as operações foram sincronizadas com sucesso.",
+                font=("Arial", 12),
+                text_color="gray"
+            )
+            desc_label.pack(pady=10)
+        else:
+            # Com pendências
+            header = ctk.CTkLabel(
+                main_frame,
+                text=f"📋 {len(pend)} operação(ões) aguardando envio ao servidor",
+                font=("Arial", 16, "bold")
+            )
+            header.pack(pady=(10, 15))
+            
+            # Frame com scroll para lista
+            scroll_frame = ctk.CTkScrollableFrame(main_frame, height=350)
+            scroll_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+            
+            for i, p in enumerate(pend, 1):
+                # Card para cada requisição
+                card = ctk.CTkFrame(scroll_frame)
+                card.pack(fill="x", padx=5, pady=5)
+                
+                # Header do card
+                card_header = ctk.CTkFrame(card)
+                card_header.pack(fill="x", padx=10, pady=8)
+                
+                # Determinar tipo de operação
+                url = p['url']
+                if '/rapido' in url:
+                    tipo = "🟠 Check-in Rápido"
+                    cor = "orange"
+                elif '/8006/' in url:
+                    tipo = "🟢 Check-in Normal"
+                    cor = "green"
+                elif '/8004/' in url:
+                    tipo = "📝 Inscrição"
+                    cor = "blue"
+                else:
+                    tipo = "📤 Operação"
+                    cor = "gray"
+                
+                tipo_label = ctk.CTkLabel(
+                    card_header,
+                    text=f"#{i} - {tipo}",
+                    font=("Arial", 13, "bold"),
+                    text_color=cor
+                )
+                tipo_label.pack(side="left")
+                
+                # Botão remover
+                remove_btn = ctk.CTkButton(
+                    card_header,
+                    text="🗑️ Remover",
+                    width=100,
+                    height=28,
+                    fg_color="red",
+                    hover_color="darkred",
+                    command=lambda pid=p['id']: self.remover_pendente(pid, popup)
+                )
+                remove_btn.pack(side="right")
+                
+                # Detalhes do card
+                details_frame = ctk.CTkFrame(card, fg_color="transparent")
+                details_frame.pack(fill="x", padx=15, pady=(0, 10))
+                
+                # Extrair informações da URL
+                info_text = self._extrair_info_url(url)
+                
+                info_label = ctk.CTkLabel(
+                    details_frame,
+                    text=info_text,
+                    font=("Arial", 11),
+                    justify="left",
+                    anchor="w"
+                )
+                info_label.pack(fill="x", pady=2)
+                
+                # Data
+                data_label = ctk.CTkLabel(
+                    details_frame,
+                    text=f"⏰ Criado em: {p['created_at'][:19]}",
+                    font=("Arial", 9),
+                    text_color="gray"
+                )
+                data_label.pack(anchor="w", pady=(5, 0))
+        
+        # Botão fechar
+        close_btn = ctk.CTkButton(
+            popup,
+            text="Fechar",
+            command=popup.destroy,
+            height=40
+        )
+        close_btn.pack(pady=(0, 15))
+    
+    def _extrair_info_url(self, url):
+        """Extrai informações legíveis da URL para o atendente"""
+        import urllib.parse
+        
+        # Parse da URL
+        parsed = urllib.parse.urlparse(url)
+        params = urllib.parse.parse_qs(parsed.query)
+        
+        info_parts = []
+        
+        if 'nome' in params:
+            info_parts.append(f"👤 Nome: {params['nome'][0]}")
+        if 'cpf' in params:
+            info_parts.append(f"📄 CPF: {params['cpf'][0]}")
+        if 'email' in params:
+            info_parts.append(f"📧 Email: {params['email'][0]}")
+        if 'inscricao_id' in params:
+            info_parts.append(f"🎫 Inscrição: {params['inscricao_id'][0][:8]}...")
+        
+        return "\n".join(info_parts) if info_parts else "Detalhes da operação"
+    
+    def remover_pendente(self, request_id, popup_window):
+        """Remove uma requisição pendente após confirmação"""
+        resposta = messagebox.askyesno(
+            "Confirmar Remoção",
+            "Tem certeza que deseja remover esta operação?\n\n"
+            "⚠️ Ela não será enviada ao servidor!\n"
+            "Use apenas se foi registrada por engano.",
+            parent=popup_window
+        )
+        
+        if resposta:
+            delete_pending_request(request_id)
+            popup_window.destroy()
+            self.mostrar_pendentes()  # Reabre com lista atualizada
+            self.update_info("✓ Operação removida da fila de sincronização.")
 
     def sync_now(self):
-        """Executa sincronização de pendentes"""
-        from sync_manager import process_pending
+        """Executa sincronização de pendentes com tratamento inteligente de erros"""
+        from sync_manager import process_pending_smart
         
         self.update_info("🔄 Sincronizando requisições pendentes...\n\nAguarde...")
         self.update()  # Force UI update
         
         try:
-            process_pending()
+            resultado = process_pending_smart()
             
-            # Verifica quantos ainda restam
+            # Monta mensagem baseada no resultado
+            mensagem = "🔄 RESULTADO DA SINCRONIZAÇÃO\n\n"
+            
+            if resultado['sucesso'] > 0:
+                mensagem += f"✓ {resultado['sucesso']} operação(ões) sincronizada(s)\n\n"
+            
+            if resultado['ja_feito'] > 0:
+                mensagem += f"ℹ️ {resultado['ja_feito']} check-in(s) já realizado(s)\n"
+                mensagem += "→ Essas pessoas podem entrar normalmente\n\n"
+            
+            if resultado['removidos'] > 0:
+                mensagem += f"🗑️ {resultado['removidos']} erro(s) permanente(s) removido(s)\n\n"
+            
+            if resultado['falhas'] > 0:
+                mensagem += f"⚠️ {resultado['falhas']} operação(ões) ainda pendente(s)\n"
+                mensagem += "→ Serão reenviadas na próxima sincronização\n\n"
+            
+            # Verifica se ainda tem pendentes
             pend = list_pending_requests()
-            
             if not pend:
-                self.update_info("✓ SINCRONIZAÇÃO CONCLUÍDA!\n\nTodas as requisições foram processadas com sucesso.")
+                mensagem += "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                mensagem += "✓ Todas as operações foram processadas!"
             else:
-                self.update_info(f"⚠️ SINCRONIZAÇÃO PARCIAL\n\n{len(pend)} requisições ainda pendentes.\nVerifique os logs para mais detalhes.")
+                mensagem += "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                mensagem += f"📋 {len(pend)} operação(ões) ainda na fila"
+            
+            self.update_info(mensagem)
                 
         except Exception as e:
             self.update_info(f"✗ ERRO NA SINCRONIZAÇÃO\n\n{str(e)}\n\nVerifique sua conexão e tente novamente.")
