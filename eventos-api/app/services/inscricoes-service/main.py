@@ -214,6 +214,41 @@ def estatisticas_inscricoes(
         "taxa_cancelamento": round((total_canceladas / total_inscricoes * 100) if total_inscricoes > 0 else 0, 2)
     }
 
+@app.get("/evento/{evento_id}/inscritos")
+def listar_inscritos_evento(
+    evento_id: UUID = Path(..., description="ID do evento"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "atendente", "administrador"))
+):
+    """
+    Lista os inscritos de um evento com detalhes básicos:
+    id da inscrição, nome, CPF e email.
+
+    REQUER: API Key + JWT + Role (atendente OU administrador)
+    """
+    inscricoes = db.query(Inscricao).filter(Inscricao.evento_id == evento_id).all()
+    if not inscricoes:
+        return []
+
+    inscritos = []
+    for i in inscricoes:
+        if not i.inscricao_rapida:
+            usuario = db.query(Usuario).filter(Usuario.id == i.usuario_id).first()
+            inscritos.append({
+                "id": str(i.id),
+                "nome": usuario.nome,
+                "cpf": usuario.cpf,
+                "email": usuario.email
+            })
+        else:
+            inscritos.append({
+                "id": str(i.id),
+                "nome": i.nome_rapido,
+                "cpf": i.cpf_rapido,
+                "email": i.email_rapido
+            })
+
+    return inscritos
 
 if __name__ == "__main__":
     import uvicorn

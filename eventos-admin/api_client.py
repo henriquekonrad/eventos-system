@@ -8,8 +8,6 @@ from db import add_pending
 load_dotenv()
 
 BASE_AUTH = "http://177.44.248.122:8001"
-TOKEN = None
-
 BASE_EVENTOS = "http://177.44.248.122:8002"
 BASE_USUARIOS = "http://177.44.248.122:8003"
 BASE_INSCRICOES = "http://177.44.248.122:8004"
@@ -18,63 +16,88 @@ BASE_CHECKINS = "http://177.44.248.122:8006"
 BASE_CERT = "http://177.44.248.122:8007"
 
 TIMEOUT = 6
+TOKEN = None
+
+def _request(method, url, json_body=None, params=None):
+    headers = auth_header()
+    headers["x-api-key"] = os.getenv("EVENTOS_API_KEY")
+    try:
+        print(f"[REQUEST] {method} {url}")
+        if json_body:
+            print(f"[REQUEST] Body: {json_body}")
+        if params:
+            print(f"[REQUEST] Params: {params}")
+        r = requests.request(method, url, json=json_body, params=params, headers=headers, timeout=6)
+        print(f"[REQUEST] Status: {r.status_code}")
+        print(f"[REQUEST] Response: {r.text}")
+        r.raise_for_status()
+        return r.json()
+    except requests.RequestException as e:
+        print(f"[REQUEST] Offline ou erro: {e}")
+        from db import add_pending
+        add_pending(method, url, json.dumps(json_body) if json_body else "", headers=json.dumps(headers))
+        return None
+
 
 def login(email, senha):
-    """
-    Faz login na API de autenticação e salva o access_token global.
-    """
+    """Login na API de auth, retorna access_token"""
     global TOKEN
     url = f"{BASE_AUTH}/login"
     headers = {
         "x-api-key": os.getenv("AUTH_API_KEY")
     }
-    params = {
-        "email": email,
-        "senha": senha
-    }
-    body = {
-        "email": email,
-        "senha": senha
-    }
-    r = requests.post(url, headers=headers, params=params, json=body, timeout=6)
-    r.raise_for_status()
-    data = r.json()
-    TOKEN = data.get("access_token")
-    return TOKEN
+    body = {"email": email, "senha": senha}
+    try:
+        r = requests.post(url, headers=headers, json=body, timeout=TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+        TOKEN = data.get("access_token")
+        print("Login efetuado com sucesso!")
+        return TOKEN
+    except requests.HTTPError as e:
+        print("Erro no login:", e.response.text)
+        return None
 
 def auth_header():
+    """Headers para requisições autenticadas"""
     if not TOKEN:
         raise Exception("Usuário não autenticado. Faça login primeiro.")
-    return {"Authorization": f"Bearer {TOKEN}"}
+    return {
+        "Authorization": f"Bearer {TOKEN}"
+    }
 
 def is_online():
-    """Verifica se consegue se conectar à API de eventos"""
+    url = f"http://177.44.248.122:8002/eventos/publicos/ativos"
+    headers = auth_header()
+    headers["x-api-key"] = os.getenv("EVENTOS_API_KEY")
     try:
-        r = requests.get(f"{BASE_EVENTOS}/publicos/ativos", headers=auth_header(), timeout=3)
+        r = requests.get(url, headers=headers, timeout=6)
+        print(f"[is_online] GET {url} -> {r.status_code}")
+        print(f"[is_online] Response: {r.text}")
         return r.status_code == 200
-    except:
+    except Exception as e:
+        print(f"[is_online] Erro ao testar conexão: {e}")
         return False
 
+
 def _request(method, url, json_body=None, params=None):
-    """Função auxiliar para requisições com suporte offline"""
     headers = auth_header()
     try:
         r = requests.request(method, url, json=json_body, params=params, headers=headers, timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
     except requests.RequestException:
-        # Se offline, salva na tabela de requisições pendentes
+        # Se offline, salva na tabela pending
         body_text = json.dumps(json_body) if json_body else ""
         add_pending(method, url, body_text, headers=json.dumps(headers))
-        print(f"Offline: requisição salva para envio posterior -> {url}")
+        print(f"Offline: requisição salva -> {url}")
         return None
 
 # -----------------------------
 # Funções da API usando _request
 # -----------------------------
-
 def listar_eventos_publicos():
-    url = f"{BASE_EVENTOS}/publicos/ativos"
+    url = f"{BASE_EVENTOS}/eventos/publicos/ativos"
     return _request("GET", url)
 
 def buscar_evento(evento_id):

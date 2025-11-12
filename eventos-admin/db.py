@@ -2,6 +2,7 @@
 import sqlite3
 from datetime import datetime
 import json
+
 DB_PATH = "data/attendant.db"
 
 def init_db():
@@ -47,15 +48,26 @@ def init_db():
     conn.commit()
     conn.close()
 
-def add_pending(method, url, body, headers=""):
+def add_pending(method, url, body, headers=None):
+    """
+    Adiciona requisição pendente na fila
+    body: dict ou string (será convertido para JSON string)
+    headers: dict ou string (será convertido para JSON string)
+    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # Garantir que body e headers são strings JSON
+    body_str = json.dumps(body) if isinstance(body, dict) else (body or "")
+    headers_str = json.dumps(headers) if isinstance(headers, dict) else (headers or "{}")
+    
     c.execute(
         "INSERT INTO pending_requests (method,url,body,headers,created_at) VALUES (?,?,?,?,?)",
-        (method, url, json.dumps(body) if body else "", headers, datetime.utcnow().isoformat())
+        (method, url, body_str, headers_str, datetime.utcnow().isoformat())
     )
     conn.commit()
     conn.close()
+    print(f"[DB] Adicionado pending: {method} {url}")
 
 # ---------- helpers for events ----------
 def upsert_evento(evento_id, nome, data_inicio):
@@ -89,19 +101,30 @@ def add_inscrito_local(inscricao_id, evento_id, nome, cpf, email, sincronizado=0
     """, (inscricao_id, evento_id, nome, cpf, email, sincronizado, created))
     conn.commit()
     conn.close()
+    print(f"[DB] Inscrito salvo: {nome} (CPF: {cpf})")
 
 def get_inscrito_by_cpf(cpf, evento_id=None):
+    """
+    Busca inscrito por CPF, opcionalmente filtrando por evento
+    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if evento_id:
-        c.execute("SELECT inscricao_id,evento_id,nome,cpf,email,sincronizado FROM inscritos WHERE cpf=? AND evento_id=?", (cpf,evento_id))
+        c.execute("SELECT inscricao_id,evento_id,nome,cpf,email,sincronizado FROM inscritos WHERE cpf=? AND evento_id=?", (cpf, evento_id))
     else:
         c.execute("SELECT inscricao_id,evento_id,nome,cpf,email,sincronizado FROM inscritos WHERE cpf=?", (cpf,))
     row = c.fetchone()
     conn.close()
     if not row:
         return None
-    return {"inscricao_id": row[0],"evento_id": row[1],"nome": row[2],"cpf": row[3],"email": row[4],"sincronizado": row[5]}
+    return {
+        "inscricao_id": row[0],
+        "evento_id": row[1],
+        "nome": row[2],
+        "cpf": row[3],
+        "email": row[4],
+        "sincronizado": row[5]
+    }
 
 def list_inscritos_por_evento(evento_id):
     conn = sqlite3.connect(DB_PATH)
@@ -110,6 +133,14 @@ def list_inscritos_por_evento(evento_id):
     rows = c.fetchall()
     conn.close()
     return [{"inscricao_id":r[0],"nome":r[1],"cpf":r[2],"email":r[3],"sincronizado":r[4]} for r in rows]
+
+def limpar_inscritos_evento(evento_id):
+    """Remove inscritos locais de um evento antes de re-sincronizar"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM inscritos WHERE evento_id=? AND sincronizado=1", (evento_id,))
+    conn.commit()
+    conn.close()
 
 # ---------- helpers for checkins ----------
 def add_checkin_local(inscricao_id, ingresso_id, usuario_id, evento_id, tipo="normal", sincronizado=0):
@@ -122,11 +153,21 @@ def add_checkin_local(inscricao_id, ingresso_id, usuario_id, evento_id, tipo="no
     """, (inscricao_id, ingresso_id, usuario_id, evento_id, tipo, sincronizado, created))
     conn.commit()
     conn.close()
+    print(f"[DB] Check-in salvo: {inscricao_id} (tipo: {tipo})")
 
 def list_pending_requests():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT id,method,url,body,created_at FROM pending_requests ORDER BY id ASC")
+    c.execute("SELECT id,method,url,body,headers,created_at FROM pending_requests ORDER BY id ASC")
     rows = c.fetchall()
     conn.close()
-    return [{"id":r[0],"method":r[1],"url":r[2],"body":r[3],"created_at":r[4]} for r in rows]
+    return [{"id":r[0],"method":r[1],"url":r[2],"body":r[3],"headers":r[4],"created_at":r[5]} for r in rows]
+
+def delete_pending_request(request_id):
+    """Remove uma requisição pendente após sincronização bem-sucedida"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM pending_requests WHERE id=?", (request_id,))
+    conn.commit()
+    conn.close()
+    print(f"[DB] Pending {request_id} removido")
