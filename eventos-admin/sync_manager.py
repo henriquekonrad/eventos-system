@@ -45,7 +45,8 @@ def sync_eventos():
 def sync_inscritos_evento(evento_id):
     """
     Baixa todos os inscritos de um evento específico.
-    REQUER: JWT + API Key
+    IMPORTANTE: Você precisa ter um endpoint na API que retorne os inscritos.
+    Se não tiver, precisaremos adaptar.
     """
     if not is_online():
         print("[SYNC] Offline: não é possível sincronizar inscritos")
@@ -55,9 +56,11 @@ def sync_inscritos_evento(evento_id):
     headers["x-api-key"] = os.getenv("INSCRICOES_API_KEY")
     
     try:
+        # ATENÇÃO: Este endpoint pode não existir na sua API!
+        # Você vai precisar criar ou adaptar para usar outro endpoint
         url = f"http://177.44.248.122:8004/evento/{evento_id}/inscritos"
-        print(f"[SYNC] Tentando baixar inscritos: {url}")
         
+        print(f"[SYNC] Tentando baixar inscritos: {url}")
         r = requests.get(url, headers=headers, timeout=6)
         r.raise_for_status()
         inscritos = r.json()
@@ -108,25 +111,24 @@ def process_pending():
     
     for p in pendentes:
         try:
-            headers = json.loads(p["headers"])
-            # Garante JWT + API Key correta
-            if "8006" in p["url"]:  # Checkins
+            # Parse headers e body
+            headers = json.loads(p.get("headers", "{}")) if p.get("headers") else {}
+            
+            # Adiciona API key apropriada baseada na URL
+            if "8004" in p["url"]:  # inscricoes
+                headers["x-api-key"] = os.getenv("INSCRICOES_API_KEY")
+            elif "8006" in p["url"]:  # checkins
                 headers["x-api-key"] = os.getenv("CHECKINS_API_KEY")
             
             body = json.loads(p["body"]) if p["body"] else None
-            # Se tiver query params, reconstruir na chamada request
-            query_params = None
-            if "?" in p["url"]:
-                url, query_str = p["url"].split("?", 1)
-                query_params = dict(x.split("=") for x in query_str.split("&"))
-            else:
-                url = p["url"]
-
+            
+            print(f"[SYNC] Processando: {p['method']} {p['url']}")
+            print(f"[SYNC] Body: {body}")
+            
             r = requests.request(
                 p["method"],
-                url,
+                p["url"],
                 json=body,
-                params=query_params,
                 headers=headers,
                 timeout=6
             )

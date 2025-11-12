@@ -18,30 +18,6 @@ BASE_CERT = "http://177.44.248.122:8007"
 TIMEOUT = 6
 TOKEN = None
 
-def _request(method, url, json_body=None, params=None, api_key_env=None):
-    headers = auth_header()
-    if api_key_env:
-        headers["x-api-key"] = os.getenv(api_key_env)
-
-    try:
-        r = requests.request(method, url, json=json_body, params=params, headers=headers, timeout=TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    except requests.RequestException:
-        from db import add_pending
-        # salva os parâmetros e headers para reconstruir depois
-        data = {
-            "method": method,
-            "url": url,
-            "body": json_body,
-            "params": params,
-            "headers": headers
-        }
-        print(f"[OFFLINE] Salvando requisição pendente: {url}")
-        add_pending(**data)
-        return None
-
-
 def login(email, senha):
     """Login na API de auth, retorna access_token"""
     global TOKEN
@@ -70,20 +46,40 @@ def auth_header():
     }
 
 def is_online():
-    url = f"http://177.44.248.122:8002/eventos/publicos/ativos"
+    """Testa conectividade com a API"""
+    url = f"{BASE_EVENTOS}/eventos/publicos/ativos"
     headers = auth_header()
     headers["x-api-key"] = os.getenv("EVENTOS_API_KEY")
     try:
         r = requests.get(url, headers=headers, timeout=6)
         print(f"[is_online] GET {url} -> {r.status_code}")
-        print(f"[is_online] Response: {r.text}")
         return r.status_code == 200
     except Exception as e:
         print(f"[is_online] Erro ao testar conexão: {e}")
         return False
 
+def _request(method, url, json_body=None, params=None):
+    """Requisição genérica com fallback para pending"""
+    headers = auth_header()
+    headers["x-api-key"] = os.getenv("EVENTOS_API_KEY")
+    try:
+        print(f"[REQUEST] {method} {url}")
+        if json_body:
+            print(f"[REQUEST] Body: {json_body}")
+        if params:
+            print(f"[REQUEST] Params: {params}")
+        r = requests.request(method, url, json=json_body, params=params, headers=headers, timeout=6)
+        print(f"[REQUEST] Status: {r.status_code}")
+        print(f"[REQUEST] Response: {r.text}")
+        r.raise_for_status()
+        return r.json()
+    except requests.RequestException as e:
+        print(f"[REQUEST] Offline ou erro: {e}")
+        add_pending(method, url, json_body, headers)
+        return None
+
 # -----------------------------
-# Funções da API usando _request
+# Funções da API
 # -----------------------------
 def listar_eventos_publicos():
     url = f"{BASE_EVENTOS}/eventos/publicos/ativos"
@@ -98,15 +94,32 @@ def inscricao_rapida(evento_id, nome, cpf, email):
     body = {"evento_id": evento_id, "nome_rapido": nome, "cpf_rapido": cpf, "email_rapido": email}
     return _request("POST", url, json_body=body)
 
+def buscar_ingresso_por_inscricao(inscricao_id):
+    """
+    Busca o ingresso de uma inscrição específica.
+    Endpoint: GET /inscricao/{inscricao_id}/ingresso
+    """
+    headers = auth_header()
+    headers["x-api-key"] = os.getenv("INGRESSOS_API_KEY")
+    
+    try:
+        url = f"{BASE_INGRESSOS}/inscricao/{inscricao_id}/ingresso"
+        print(f"[API] Buscando ingresso: {url}")
+        r = requests.get(url, headers=headers, timeout=6)
+        r.raise_for_status()
+        return r.json()
+    except requests.HTTPError as e:
+        print(f"[API] Erro ao buscar ingresso: {e.response.status_code}")
+        print(f"[API] Response: {e.response.text}")
+        return None
+    except Exception as e:
+        print(f"[API] Erro: {e}")
+        return None
+
 def registrar_checkin(inscricao_id, ingresso_id, usuario_id):
     url = f"{BASE_CHECKINS}/"
-    params = {
-        "inscricao_id": inscricao_id,
-        "ingresso_id": ingresso_id,
-        "usuario_id": usuario_id
-    }
-    return _request("POST", url, params=params, api_key_env="CHECKINS_API_KEY")
-
+    params = {"inscricao_id": inscricao_id, "ingresso_id": ingresso_id, "usuario_id": usuario_id}
+    return _request("POST", url, params=params)
 
 def emitir_certificado(inscricao_id, evento_id):
     url = f"{BASE_CERT}/emitir"
