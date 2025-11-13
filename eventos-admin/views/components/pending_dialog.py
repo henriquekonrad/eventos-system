@@ -1,8 +1,3 @@
-# views/components/pending_dialog.py
-"""
-Dialog de Requisições Pendentes.
-Exibe e gerencia fila de sincronização.
-"""
 import customtkinter as ctk
 from tkinter import messagebox
 from typing import Callable, Optional
@@ -22,20 +17,13 @@ class PendingDialog:
         parent: ctk.CTk,
         on_remove: Optional[Callable[[int], None]] = None
     ):
-        """
-        Args:
-            parent: Janela pai
-            on_remove: Callback chamado após remover pendente (recebe request_id)
-        """
         self.parent = parent
         self.on_remove = on_remove
         
-        # Repositories
         self.pending_repo = PendingRepository()
         self.checkin_repo = CheckinRepository()
         self.inscrito_repo = InscritoRepository()
         
-        # UI
         self.popup = None
     
     def show(self):
@@ -52,12 +40,11 @@ class PendingDialog:
         self._create_close_button()
     
     def _create_popup(self):
-        """Cria janela popup"""
+        """Cria janela"""
         self.popup = ctk.CTkToplevel(self.parent)
         self.popup.title("Requisições Aguardando Sincronização")
         self.popup.geometry(UIConfig.DIALOG_LARGE)
         
-        # Traz para frente
         self.popup.update_idletasks()
         self.popup.attributes('-topmost', True)
         self.popup.focus_force()
@@ -97,19 +84,16 @@ class PendingDialog:
         main_frame = ctk.CTkFrame(self.popup)
         main_frame.pack(fill="both", expand=True, padx=15, pady=15)
         
-        # Header
         header = ctk.CTkLabel(
             main_frame,
-            text=f"📋 {len(pendentes)} operação(ões) aguardando envio ao servidor",
+            text=f"{len(pendentes)} operação(ões) aguardando envio ao servidor",
             font=("Arial", 16, "bold")
         )
         header.pack(pady=(10, 15))
         
-        # Frame com scroll
         scroll_frame = ctk.CTkScrollableFrame(main_frame, height=350)
         scroll_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
-        # Renderiza cada pendente
         for i, pendente in enumerate(pendentes, 1):
             self._create_pending_card(scroll_frame, i, pendente)
     
@@ -136,7 +120,7 @@ class PendingDialog:
         # Botão remover
         remove_btn = ctk.CTkButton(
             card_header,
-            text="🗑️ Remover",
+            text="Remover",
             width=100,
             height=28,
             fg_color=UIConfig.COLOR_ERROR,
@@ -149,7 +133,6 @@ class PendingDialog:
         details_frame = ctk.CTkFrame(card, fg_color="transparent")
         details_frame.pack(fill="x", padx=15, pady=(0, 10))
         
-        # Extrai informações legíveis
         info_text = self._extract_info_from_url(pendente['url'])
         
         info_label = ctk.CTkLabel(
@@ -161,17 +144,15 @@ class PendingDialog:
         )
         info_label.pack(fill="x", pady=2)
         
-        # Data
         data_label = ctk.CTkLabel(
             details_frame,
-            text=f"⏰ Criado em: {pendente['created_at'][:19]}",
+            text=f"Criado em: {pendente['created_at'][:19]}",
             font=("Arial", 9),
             text_color="gray"
         )
         data_label.pack(anchor="w", pady=(5, 0))
     
     def _create_close_button(self):
-        """Cria botão de fechar"""
         close_btn = ctk.CTkButton(
             self.popup,
             text="Fechar",
@@ -183,13 +164,13 @@ class PendingDialog:
     def _get_operation_type(self, url: str) -> tuple:
         """Retorna (tipo, cor) baseado na URL"""
         if '/rapido' in url:
-            return ("🟠 Check-in Rápido", UIConfig.COLOR_WARNING)
+            return ("Check-in Rápido", UIConfig.COLOR_WARNING)
         elif '/8006/' in url:
-            return ("🟢 Check-in Normal", UIConfig.COLOR_SUCCESS)
+            return ("Check-in Normal", UIConfig.COLOR_SUCCESS)
         elif '/8004/' in url:
-            return ("📝 Inscrição", UIConfig.COLOR_INFO)
+            return ("Inscrição", UIConfig.COLOR_INFO)
         else:
-            return ("📤 Operação", "gray")
+            return ("Operação", "gray")
     
     def _extract_info_from_url(self, url: str) -> str:
         """Extrai informações legíveis da URL"""
@@ -223,23 +204,18 @@ class PendingDialog:
         if not resposta:
             return
         
-        # Remove pendência e obtém info
         info = self.pending_repo.delete(request_id)
         
         # Limpa dados locais relacionados
         if info and info['related_inscricao_id']:
-            # Remove check-in
             self.checkin_repo.delete_by_inscricao(info['related_inscricao_id'])
             
-            # Remove inscrito se for local (não sincronizado)
             inscrito = self.inscrito_repo.find_by_id(info['related_inscricao_id'])
             if inscrito and inscrito['sincronizado'] == 0:
                 self.inscrito_repo.delete(info['related_inscricao_id'])
         
-        # Callback
         if self.on_remove:
             self.on_remove(request_id)
         
-        # Fecha e reabre dialog com lista atualizada
         self.popup.destroy()
         self.show()

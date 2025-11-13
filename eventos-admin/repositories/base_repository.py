@@ -1,8 +1,3 @@
-# repositories/base_repository.py
-"""
-Padrão Repository: Abstrai o acesso ao banco de dados.
-Facilita testes e mudança de banco no futuro.
-"""
 import sqlite3
 from typing import List, Dict, Optional, Any
 from config.settings import DB_PATH

@@ -1,8 +1,3 @@
-# repositories/evento_repository.py
-"""
-Repository para Eventos.
-Gerencia operações de banco relacionadas a eventos.
-"""
 from typing import Optional, List, Dict
 from datetime import datetime
 from repositories.base_repository import BaseRepository

@@ -1,8 +1,3 @@
-# main.py
-"""
-Entry Point do Sistema de Check-in.
-Inicializa banco de dados e abre tela de login.
-"""
 import customtkinter as ctk
 import sqlite3
 from config.settings import UIConfig, DB_PATH
@@ -80,7 +75,6 @@ def init_database():
     print("Banco de dados inicializado")
 
 def main():
-    """Função principal"""
     ctk.set_appearance_mode(UIConfig.APPEARANCE_MODE)
     ctk.set_default_color_theme(UIConfig.COLOR_THEME)
     

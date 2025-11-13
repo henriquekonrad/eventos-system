@@ -1,8 +1,3 @@
-# services/sync_service.py
-"""
-Service de Sincronização.
-Gerencia sincronização de eventos, inscritos e requisições pendentes.
-"""
 import requests
 import json
 from typing import Dict
@@ -16,7 +11,6 @@ from config.settings import APIKeys
 class SyncService:
     """
     Gerencia todas as operações de sincronização.
-    Padrão Facade: Simplifica sincronização complexa.
     """
     
     def __init__(self):
@@ -26,7 +20,7 @@ class SyncService:
         self.checkin_repo = CheckinRepository()
         self.api_service = APIService()
     
-    # ========== SINCRONIZAÇÃO DE EVENTOS ==========
+    # EVENTOS
     
     def sincronizar_eventos(self) -> bool:
         """Sincroniza eventos da API para banco local"""
@@ -55,7 +49,7 @@ class SyncService:
             print(f"[SYNC] ✗ Erro ao sincronizar eventos: {e}")
             return False
     
-    # ========== SINCRONIZAÇÃO DE INSCRITOS ==========
+    # INSCRITOS
     
     def sincronizar_inscritos_evento(self, evento_id: str) -> bool:
         """Sincroniza inscritos de um evento específico"""
@@ -67,7 +61,7 @@ class SyncService:
             inscritos = self.api_service.listar_inscritos_evento(evento_id)
             
             if inscritos is None:
-                print("[SYNC] ✗ Erro ao buscar inscritos da API")
+                print("[SYNC] Erro ao buscar inscritos da API")
                 return False
             
             # Limpa inscritos antigos (apenas sincronizados)
@@ -81,7 +75,7 @@ class SyncService:
                     nome=inscrito.get("nome", ""),
                     cpf=inscrito.get("cpf", ""),
                     email=inscrito.get("email", ""),
-                    sincronizado=1  # Veio do servidor
+                    sincronizado=1
                 )
             
             print(f"[SYNC] ✓ Sincronizados {len(inscritos)} inscritos do evento")
@@ -91,7 +85,7 @@ class SyncService:
             print(f"[SYNC] ✗ Erro ao sincronizar inscritos: {e}")
             return False
     
-    # ========== SINCRONIZAÇÃO DE PENDENTES ==========
+    # PENDENTES
     
     def processar_pendentes(self) -> Dict:
         """
@@ -147,7 +141,6 @@ class SyncService:
         Retorna: 'sucesso', 'ja_feito', 'removido', 'falha'
         """
         try:
-            # Parse headers e body
             headers = json.loads(pendente.get("headers", "{}"))
             body = json.loads(pendente["body"]) if pendente["body"] else None
             
@@ -208,7 +201,7 @@ class SyncService:
         
         # Check-in já realizado
         if "já foi realizado" in response_text or "já registrado" in response_text:
-            print(f"[SYNC] ℹ️ Check-in já realizado - REMOVENDO")
+            print(f"[SYNC] ℹCheck-in já realizado - REMOVENDO")
             if pendente.get('related_inscricao_id'):
                 self.checkin_repo.mark_as_synced(pendente['related_inscricao_id'])
             self.pending_repo.delete(pendente["id"])
@@ -216,19 +209,19 @@ class SyncService:
         
         # Inscrição já existe
         if "já inscrito" in response_text:
-            print(f"[SYNC] ℹ️ Inscrição já existe - REMOVENDO")
+            print(f"[SYNC] ℹInscrição já existe - REMOVENDO")
             self.pending_repo.delete(pendente["id"])
             return "ja_feito"
         
         # 404 - Não encontrado
         if response.status_code == 404:
-            print(f"[SYNC] ⚠️ Recurso não encontrado (404) - REMOVENDO")
+            print(f"[SYNC] Recurso não encontrado (404) - REMOVENDO")
             self.pending_repo.delete(pendente["id"])
             return "removido"
         
         # 400/409 - Erro de dados
         if response.status_code in [400, 409]:
-            print(f"[SYNC] ⚠️ Erro de dados ({response.status_code}) - REMOVENDO")
+            print(f"[SYNC] Erro de dados ({response.status_code}) - REMOVENDO")
             self.pending_repo.delete(pendente["id"])
             return "removido"
         

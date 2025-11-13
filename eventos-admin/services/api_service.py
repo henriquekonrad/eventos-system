@@ -1,9 +1,3 @@
-# services/api_service.py
-"""
-Service de comunicação com API.
-Centraliza todas as chamadas HTTP.
-Padrão Singleton: Mantém token único.
-"""
 import requests
 from typing import Optional, Dict
 from config.settings import APIConfig, APIKeys
@@ -11,7 +5,6 @@ from config.settings import APIConfig, APIKeys
 class APIService:
     """
     Gerencia comunicação com API externa.
-    Padrão Singleton implícito via atributo de classe.
     """
     
     _token: Optional[str] = None
@@ -55,7 +48,7 @@ class APIService:
             print(f"[API] Erro ao testar conexão: {e}")
             return False
     
-    # ========== AUTH ==========
+    # AUTH
     
     def login(self, email: str, senha: str) -> Optional[str]:
         """Faz login e retorna token"""
@@ -88,7 +81,7 @@ class APIService:
             print(f"[API] Erro: {e}")
             return None
     
-    # ========== EVENTOS ==========
+    # EVENTOS
     
     def listar_eventos_publicos(self) -> Optional[list]:
         """Lista eventos públicos ativos"""
@@ -118,7 +111,7 @@ class APIService:
             print(f"[API] Erro ao buscar evento: {e}")
             return None
     
-    # ========== INSCRIÇÕES ==========
+    # INSCRIÇÕES
     
     def listar_inscritos_evento(self, evento_id: str) -> Optional[list]:
         """Lista inscritos de um evento"""
@@ -137,7 +130,7 @@ class APIService:
             print(f"[API] Erro: {e}")
             return None
     
-    # ========== INGRESSOS ==========
+    # INGRESSOS
     
     def buscar_ingresso(self, inscricao_id: str) -> Optional[Dict]:
         """Busca ingresso por inscrição"""
@@ -156,7 +149,7 @@ class APIService:
             print(f"[API] Erro: {e}")
             return None
     
-    # ========== USUÁRIOS ==========
+    # USUARIOS
     
     def buscar_usuario_por_email(self, email: str) -> Optional[Dict]:
         """Busca usuário por email"""

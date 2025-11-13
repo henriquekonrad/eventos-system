@@ -1,8 +1,3 @@
-# services/evento_service.py
-"""
-Service de Eventos.
-Gerencia lógica de negócio relacionada a eventos.
-"""
 from typing import List, Dict, Optional
 from repositories.evento_repository import EventoRepository
 from services.api_service import APIService

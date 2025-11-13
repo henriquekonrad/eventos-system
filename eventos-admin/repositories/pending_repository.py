@@ -1,8 +1,3 @@
-# repositories/pending_repository.py
-"""
-Repository para Requisições Pendentes.
-Gerencia fila de sincronização com API.
-"""
 from typing import List, Dict, Optional
 from datetime import datetime
 import json
@@ -23,7 +18,6 @@ class PendingRepository(BaseRepository):
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """
         
-        # Serializa body e headers para JSON
         body_str = json.dumps(body) if isinstance(body, dict) else (body or "")
         headers_str = json.dumps(headers) if isinstance(headers, dict) else (headers or "{}")
         

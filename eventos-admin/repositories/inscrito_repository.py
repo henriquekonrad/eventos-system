@@ -1,8 +1,3 @@
-# repositories/inscrito_repository.py
-"""
-Repository para Inscritos.
-Gerencia operações de banco relacionadas a inscrições.
-"""
 from typing import Optional, List, Dict
 from datetime import datetime
 from repositories.base_repository import BaseRepository

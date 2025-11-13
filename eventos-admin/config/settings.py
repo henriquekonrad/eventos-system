@@ -1,19 +1,14 @@
-# config/settings.py
-"""
-Configurações centralizadas do sistema.
-Padrão: Singleton implícito via módulo Python
-"""
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ========== DATABASE ==========
+# Database
 DB_PATH = "data/attendant.db"
 
-# ========== API ENDPOINTS ==========
+# Endpoints
 class APIConfig:
-    BASE_URL = "http://177.44.248.122"
+    BASE_URL = os.getenv("BASE_URL")
     
     AUTH = f"{BASE_URL}:8001"
     EVENTOS = f"{BASE_URL}:8002"
@@ -25,7 +20,7 @@ class APIConfig:
     
     TIMEOUT = 6
 
-# ========== API KEYS ==========
+# Keys
 class APIKeys:
     AUTH = os.getenv("AUTH_API_KEY")
     EVENTOS = os.getenv("EVENTOS_API_KEY")
@@ -35,18 +30,17 @@ class APIKeys:
     CHECKINS = os.getenv("CHECKINS_API_KEY")
     CERTIFICADOS = os.getenv("CERTIFICADOS_API_KEY")
 
-# ========== UI CONFIG ==========
+# Config geral UI
 class UIConfig:
-    APPEARANCE_MODE = "System"
+    APPEARANCE_MODE = "dark"
     COLOR_THEME = "blue"
     
-    # Cores semânticas
     COLOR_SUCCESS = "green"
     COLOR_WARNING = "orange"
     COLOR_ERROR = "red"
     COLOR_INFO = "blue"
+    COLOR_RAPIDA = "#e08f3f"
     
-    # Tamanhos
     MAIN_WINDOW_SIZE = "1100x650"
     DIALOG_SMALL = "450x300"
     DIALOG_MEDIUM = "500x380"

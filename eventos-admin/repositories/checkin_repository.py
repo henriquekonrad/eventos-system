@@ -1,8 +1,3 @@
-# repositories/checkin_repository.py
-"""
-Repository para Check-ins.
-Encapsula todas as operações de banco relacionadas a check-ins.
-"""
 from typing import Optional, Dict
 from datetime import datetime
 from repositories.base_repository import BaseRepository

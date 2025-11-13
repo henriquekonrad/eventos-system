@@ -81,7 +81,7 @@ class CheckinView(ctk.CTkFrame):
             text="Inscrição Rápida + Check-in (sem cadastro)", 
             command=self._on_quick_registration_click,
             height=40,
-            fg_color=UIConfig.COLOR_WARNING,
+            fg_color=UIConfig.COLOR_RAPIDA,
             hover_color="darkorange"
         )
         rapida_btn.pack(padx=8, pady=(4,8), fill="x")
