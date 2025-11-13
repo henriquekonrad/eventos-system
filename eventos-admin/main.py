@@ -64,25 +64,23 @@ def init_database():
         )
     """)
     
-    # Migração: adiciona colunas se não existirem
     try:
         cursor.execute("ALTER TABLE pending_requests ADD COLUMN related_inscricao_id TEXT")
     except sqlite3.OperationalError:
-        pass  # Coluna já existe
+        pass
     
     try:
         cursor.execute("ALTER TABLE pending_requests ADD COLUMN related_cpf TEXT")
     except sqlite3.OperationalError:
-        pass  # Coluna já existe
+        pass
     
     conn.commit()
     conn.close()
     
-    print("[DB] Banco de dados inicializado")
+    print("Banco de dados inicializado")
 
 def main():
     """Função principal"""
-    # Configuração do customtkinter
     ctk.set_appearance_mode(UIConfig.APPEARANCE_MODE)
     ctk.set_default_color_theme(UIConfig.COLOR_THEME)
     
