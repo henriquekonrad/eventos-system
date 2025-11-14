@@ -1,8 +1,5 @@
-"""
-Microsserviço de Inscrições
-Porta: 8004
-"""
-from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
+import logging
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from secrets import token_urlsafe
@@ -20,6 +17,8 @@ from app.shared.core.security import (
 )
 from app.shared.helpers.email_helper import enviar_email_sync
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Inscricoes Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
 
@@ -29,7 +28,6 @@ def criar_inscricao_normal(
     evento_id: UUID,
     usuario_id: UUID,
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
 ):
     """
@@ -62,16 +60,19 @@ def criar_inscricao_normal(
     db.commit()
     db.refresh(inscr)
     
-    # Enviar email de confirmação em background
-    background_tasks.add_task(
-        enviar_email_sync,
-        to=usuario.email,
-        template="inscricao",
-        data={
-            "nome": usuario.nome,
-            "evento": evento.nome
-        }
-    )
+    # Enviar email de confirmação
+    try:
+        if usuario.email and "@" in usuario.email:
+            enviar_email_sync(
+                to=usuario.email,
+                template="inscricao",
+                data={
+                    "nome": usuario.nome,
+                    "evento": evento.nome
+                }
+            )
+    except Exception as email_error:
+        logger.warning(f"Erro ao enviar email de inscrição: {email_error}")
     
     return {"inscricao_id": str(inscr.id), "message": "Inscrição criada"}
 
@@ -79,7 +80,6 @@ def criar_inscricao_normal(
 @app.post("/rapida", status_code=status.HTTP_201_CREATED)
 def criar_inscricao_rapida(
     payload: schemas.InscricaoCreateRapida,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
 ):
@@ -124,17 +124,19 @@ def criar_inscricao_rapida(
     db.commit()
     db.refresh(inscr)
     
-    # Enviar email de confirmação em background
-    if payload.email_rapido and "@" in payload.email_rapido:
-        background_tasks.add_task(
-            enviar_email_sync,
-            to=payload.email_rapido,
-            template="inscricao",
-            data={
-                "nome": payload.nome_rapido,
-                "evento": evento.nome
-            }
-        )
+    # Enviar email de confirmação
+    try:
+        if payload.email_rapido and "@" in payload.email_rapido:
+            enviar_email_sync(
+                to=payload.email_rapido,
+                template="inscricao",
+                data={
+                    "nome": payload.nome_rapido,
+                    "evento": evento.nome
+                }
+            )
+    except Exception as email_error:
+        logger.warning(f"Erro ao enviar email de inscrição rápida: {email_error}")
     
     return {
         "inscricao_id": str(inscr.id),
@@ -146,7 +148,6 @@ def criar_inscricao_rapida(
 @app.patch("/{inscricao_id}/cancelar", status_code=status.HTTP_200_OK)
 def cancelar_inscricao(
     inscricao_id: UUID,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
 ):
@@ -179,17 +180,19 @@ def cancelar_inscricao(
     inscr.sincronizado = False
     db.commit()
     
-    # Enviar email de cancelamento em background
-    if email and "@" in email:
-        background_tasks.add_task(
-            enviar_email_sync,
-            to=email,
-            template="cancelamento",
-            data={
-                "nome": nome,
-                "evento": evento.nome if evento else "Evento"
-            }
-        )
+    # Enviar email de cancelamento
+    try:
+        if email and "@" in email:
+            enviar_email_sync(
+                to=email,
+                template="cancelamento",
+                data={
+                    "nome": nome,
+                    "evento": evento.nome if evento else "Evento"
+                }
+            )
+    except Exception as email_error:
+        logger.warning(f"Erro ao enviar email de cancelamento: {email_error}")
     
     return {"message": "Inscrição cancelada com sucesso"}
 

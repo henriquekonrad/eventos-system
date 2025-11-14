@@ -1,9 +1,6 @@
-"""
-Microsserviço de Check-ins
-Porta: 8006
-"""
 import hashlib
-from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
+import logging
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from passlib.context import CryptContext
@@ -23,6 +20,8 @@ from app.shared.core.security import (
 from app.shared.models.ingresso import Ingresso
 from app.shared.helpers.email_helper import enviar_email_sync
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Checkins Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
 
@@ -34,7 +33,6 @@ def registrar_checkin(
     inscricao_id: UUID,
     ingresso_id: UUID,
     usuario_id: UUID,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
 ):
@@ -61,10 +59,6 @@ def registrar_checkin(
             detail="Check-in já registrado para este ingresso"
         )
     
-    # Buscar dados para email
-    evento = db.query(Evento).filter(Evento.id == inscr.evento_id).first()
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
-    
     try:
         check = Checkin(
             inscricao_id=inscricao_id,
@@ -79,17 +73,22 @@ def registrar_checkin(
 
         db.commit()
         
-        # Enviar email de check-in em background
-        if usuario and evento:
-            background_tasks.add_task(
-                enviar_email_sync,
-                to=usuario.email,
-                template="checkin",
-                data={
-                    "nome": usuario.nome,
-                    "evento": evento.nome
-                }
-            )
+        # Enviar email de check-in
+        try:
+            evento = db.query(Evento).filter(Evento.id == inscr.evento_id).first()
+            usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+            
+            if usuario and evento and usuario.email and "@" in usuario.email:
+                enviar_email_sync(
+                    to=usuario.email,
+                    template="checkin",
+                    data={
+                        "nome": usuario.nome,
+                        "evento": evento.nome
+                    }
+                )
+        except Exception as email_error:
+            logger.warning(f"Erro ao enviar email de check-in: {email_error}")
         
     except Exception as e:
         db.rollback()
@@ -112,7 +111,6 @@ def checkin_rapido(
     cpf: str,
     email: str,
     ingresso_id: UUID | None = None,
-    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
 ):
@@ -205,21 +203,24 @@ def checkin_rapido(
         db.add(check)
         db.commit()
         
-        # Enviar email de check-in em background
-        if email and "@" in email:
-            background_tasks.add_task(
-                enviar_email_sync,
-                to=email,
-                template="checkin",
-                data={
-                    "nome": nome,
-                    "evento": evento.nome
-                }
-            )
+        # Enviar email de check-in
+        try:
+            if email and "@" in email:
+                enviar_email_sync(
+                    to=email,
+                    template="checkin",
+                    data={
+                        "nome": nome,
+                        "evento": evento.nome
+                    }
+                )
+        except Exception as email_error:
+            logger.warning(f"Erro ao enviar email de check-in rápido: {email_error}")
         
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao registrar check-in rápido: {e}"
