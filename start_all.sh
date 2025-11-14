@@ -10,6 +10,37 @@ APP_DIR=~/eventos/eventos-api
 
 mkdir -p "$LOG_DIR"
 
+start_node_service() {
+    local service_name=$1
+    local port=$2
+    local service_path="${APP_DIR}/app/services/${service_name}"
+    local log_file="${LOG_DIR}/${service_name}.log"
+    local pid_file="${LOG_DIR}/${service_name}.pid"
+
+    echo "🚀 Iniciando ${service_name} (Node) na porta ${port}..."
+
+    # Evita instâncias duplicadas
+    if [ -f "$pid_file" ] && ps -p $(cat "$pid_file") > /dev/null 2>&1; then
+        echo "⚠️  ${service_name} já está em execução (PID $(cat $pid_file))"
+        return
+    fi
+
+    cd "$service_path" || { echo "❌ Diretorio $service_path não existe"; return; }
+
+    nohup npm start > "$log_file" 2>&1 &
+    sleep 1
+
+    node_pid=$(pgrep -f "node src/server.js" | head -n 1)
+    echo $! > "$pid_file"
+
+    sleep 1
+    if ps -p $(cat "$pid_file") > /dev/null 2>&1; then
+        echo "✅ ${service_name} iniciado (PID $(cat $pid_file))"
+    else
+        echo "❌ Falha ao iniciar ${service_name}. Veja o log em ${log_file}"
+    fi
+}
+
 start_service() {
     local service_name=$1
     local port=$2
@@ -48,6 +79,7 @@ start_service "inscricoes-service" 8004
 start_service "ingressos-service" 8005
 start_service "checkins-service" 8006
 start_service "certificados-service" 8007
+start_node_service "email-service" 4005
 
 echo ""
 echo "📊 Use './status.sh' para verificar o status dos serviços."
