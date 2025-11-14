@@ -38,6 +38,7 @@ check_service "inscricoes-service" "8004"
 check_service "ingressos-service" "8005"
 check_service "checkins-service" "8006"
 check_service "certificados-service" "8007"
+check_service "email-service" "4005"
 
 echo ""
 echo "💡 Dicas:"
