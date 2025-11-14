@@ -59,6 +59,16 @@ def init_database():
         )
     """)
     
+    # Cache
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS auth_cache (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            token TEXT,
+            email TEXT,
+            saved_at TEXT
+        )
+    """)
+    
     try:
         cursor.execute("ALTER TABLE pending_requests ADD COLUMN related_inscricao_id TEXT")
     except sqlite3.OperationalError:
@@ -72,7 +82,7 @@ def init_database():
     conn.commit()
     conn.close()
     
-    print("Banco de dados inicializado")
+    print("[DB] Banco de dados inicializado")
 
 def main():
     ctk.set_appearance_mode(UIConfig.APPEARANCE_MODE)

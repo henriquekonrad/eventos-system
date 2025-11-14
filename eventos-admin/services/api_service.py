@@ -7,21 +7,63 @@ class APIService:
     Gerencia comunicação com API externa.
     """
     
-    _token: Optional[str] = None
-    
     def __init__(self):
         self.timeout = APIConfig.TIMEOUT
+        self._token = None
+        self._token_loaded_from_cache = False
+        self._load_token_from_cache()
+        self.timeout = APIConfig.TIMEOUT
     
-    @classmethod
-    def set_token(cls, token: str):
-        """Define token de autenticação (após login)"""
+    def _load_token_from_cache(self):
+        """Carrega token do cache SQLite (se existir)"""
+        if self._token_loaded_from_cache:
+            return
+        
+        try:
+            from repositories.auth_cache_repository import AuthCacheRepository
+            cache_repo = AuthCacheRepository()
+            
+            cached = cache_repo.get_token()
+            if cached and cached['token']:
+                self._token = cached['token']
+                self._token_loaded_from_cache = True
+            else:
+                print("[API] Nenhum token em cache")
+        except Exception as e:
+            print(f"[API] Erro ao carregar token do cache: {e}")
+    
+    def set_token(cls, token: str, email: str = ""):
+        """Define token de autenticação e salva no cache"""
         cls._token = token
-        print("[API] Token definido")
+        
+        # Salva no cache
+        try:
+            from repositories.auth_cache_repository import AuthCacheRepository
+            cache_repo = AuthCacheRepository()
+            cache_repo.save_token(token, email)
+            print(f"[API] Token definido e salvo no cache")
+        except Exception as e:
+            print(f"[API] Erro ao salvar token no cache: {e}")
     
-    @classmethod
+    def clear_token(cls):
+        """Remove token (logout)"""
+        cls._token = None
+        
+        try:
+            from repositories.auth_cache_repository import AuthCacheRepository
+            cache_repo = AuthCacheRepository()
+            cache_repo.clear_token()
+            print("[API] Token limpo")
+        except Exception as e:
+            print(f"[API] Erro ao limpar token: {e}")
+    
     def get_token(cls) -> Optional[str]:
         """Retorna token atual"""
         return cls._token
+    
+    def has_token(cls) -> bool:
+        """Verifica se tem token disponível"""
+        return cls._token is not None
     
     def get_auth_headers(self) -> Dict[str, str]:
         """Retorna headers com autenticação"""

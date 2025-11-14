@@ -1,20 +1,24 @@
 import customtkinter as ctk
 from config.settings import UIConfig
 from services.api_service import APIService
+from repositories.auth_cache_repository import AuthCacheRepository
 from views.main_view import MainView
 
 class LoginView(ctk.CTk):
     def __init__(self):
         super().__init__()
+        
         self.api_service = APIService()
+        self.auth_cache = AuthCacheRepository()
 
-        # Configuração da janela
+        if self._try_auto_login():
+            return
+
         self.title("Login - Sistema de Eventos")
         self.height = 375
         self.width = 400
         self._setup_ui()
         self._center_window()
-        
     
     def _center_window(self):
         self.update_idletasks()
@@ -90,6 +94,7 @@ class LoginView(ctk.CTk):
         entry.pack(fill="x")
     
     def _on_login_click(self):
+        """Tenta fazer login"""
         email = self.email_var.get().strip()
         senha = self.senha_var.get().strip()
         
@@ -100,6 +105,7 @@ class LoginView(ctk.CTk):
         self.login_btn.configure(state="disabled", text="Conectando...")
         self.update()
         
+        # Tenta login
         token = self.api_service.login(email, senha)
         
         if token:
@@ -110,10 +116,29 @@ class LoginView(ctk.CTk):
             self.login_btn.configure(state="normal", text="Entrar")
     
     def _show_error(self, message: str):
-        self.error_label.configure(text=f"Erro: {message}")
+        """Exibe mensagem de erro"""
+        self.error_label.configure(text=f"ERRO: {message}")
     
     def _open_main_window(self):
         self.withdraw()
         main_window = MainView()
         main_window.mainloop()
         self.destroy()
+
+    def _try_auto_login(self) -> bool:
+        """Tenta login automático usando token salvo no cache"""
+        
+        if not self.api_service.has_token():
+            print("Nenhum token carregado do cache")
+            return False
+
+        # Testa token
+        if self.api_service.is_online():
+            print("Auto-login bem-sucedido")
+            self._open_main_window()
+            return True
+
+        # Se inválido, limpa token
+        print("Token salvo é inválido. Limpando cache")
+        self.api_service.clear_token()
+        return False

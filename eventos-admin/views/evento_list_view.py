@@ -31,7 +31,14 @@ class EventoListView(ctk.CTkFrame):
         title.pack(pady=(10, 5))
         
         # Listbox
-        self.listbox = tk.Listbox(self, width=50, height=20)
+        self.listbox = tk.Listbox(self, width=50, height=20,
+                                  bg="#1a1a1a",
+                                    fg="white",
+                                    selectbackground="#3273A8",
+                                    selectforeground="white",
+                                    highlightbackground="#2a3658",
+                                    highlightcolor="#2a2a2a",
+                                    borderwidth=0,)
         self.listbox.pack(padx=10, pady=(5, 10), fill="both", expand=True)
         self.listbox.bind("<<ListboxSelect>>", self._on_select)
         
