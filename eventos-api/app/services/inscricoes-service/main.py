@@ -28,14 +28,12 @@ add_common_middlewares(app, audit=True)
 def criar_inscricao_normal(
     evento_id: UUID,
     usuario_id: UUID,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
 ):
     """
-    Cria uma inscrição normal para um usuário já cadastrado.
-    
-    REQUER: API Key + JWT + Role (administrador OU atendente)
+    Cria uma inscrição normal para um usuário já cadastrado
     """
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:

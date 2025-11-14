@@ -40,9 +40,7 @@ def registrar_checkin(
 ):
     """
     Registra check-in para uma inscrição existente.
-    Vincula o check-in a um ingresso e usuário específicos.
-    
-    REQUER: API Key + JWT + Role (atendente OU administrador)
+    Vincula o check-in a um ingresso e usuário específicos
     """
     inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscr:
@@ -113,8 +111,8 @@ def checkin_rapido(
     nome: str,
     cpf: str,
     email: str,
-    background_tasks: BackgroundTasks,
     ingresso_id: UUID | None = None,
+    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
 ):
