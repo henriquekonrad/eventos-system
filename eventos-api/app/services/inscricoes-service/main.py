@@ -2,7 +2,7 @@
 Microsserviço de Inscrições
 Porta: 8004
 """
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from secrets import token_urlsafe
@@ -18,6 +18,7 @@ from app.shared.core.security import (
     require_jwt_and_service_key,
     require_service_api_key
 )
+from app.shared.helpers.email_helper import enviar_email_sync
 
 app = FastAPI(title="Inscricoes Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
@@ -27,6 +28,7 @@ add_common_middlewares(app, audit=True)
 def criar_inscricao_normal(
     evento_id: UUID,
     usuario_id: UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
 ):
@@ -62,12 +64,24 @@ def criar_inscricao_normal(
     db.commit()
     db.refresh(inscr)
     
+    # Enviar email de confirmação em background
+    background_tasks.add_task(
+        enviar_email_sync,
+        to=usuario.email,
+        template="inscricao",
+        data={
+            "nome": usuario.nome,
+            "evento": evento.nome
+        }
+    )
+    
     return {"inscricao_id": str(inscr.id), "message": "Inscrição criada"}
 
 
 @app.post("/rapida", status_code=status.HTTP_201_CREATED)
 def criar_inscricao_rapida(
     payload: schemas.InscricaoCreateRapida,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
 ):
@@ -112,11 +126,74 @@ def criar_inscricao_rapida(
     db.commit()
     db.refresh(inscr)
     
+    # Enviar email de confirmação em background
+    if payload.email_rapido and "@" in payload.email_rapido:
+        background_tasks.add_task(
+            enviar_email_sync,
+            to=payload.email_rapido,
+            template="inscricao",
+            data={
+                "nome": payload.nome_rapido,
+                "evento": evento.nome
+            }
+        )
+    
     return {
         "inscricao_id": str(inscr.id),
         "usuario_id": str(usuario_rapido.id),
         "message": "Inscrição rápida criada com usuário rápido associado"
     }
+
+
+@app.patch("/{inscricao_id}/cancelar", status_code=status.HTTP_200_OK)
+def cancelar_inscricao(
+    inscricao_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
+):
+    """
+    Cancela uma inscrição existente.
+    
+    REQUER: API Key + JWT + Role (administrador OU atendente)
+    """
+    inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
+    if not inscr:
+        raise HTTPException(status_code=404, detail="Inscrição não encontrada")
+    
+    if inscr.status == "cancelada":
+        raise HTTPException(status_code=400, detail="Inscrição já está cancelada")
+    
+    # Buscar evento para pegar o nome
+    evento = db.query(Evento).filter(Evento.id == inscr.evento_id).first()
+    
+    # Buscar dados do usuário para email
+    if inscr.inscricao_rapida:
+        email = inscr.email_rapido
+        nome = inscr.nome_rapido
+    else:
+        usuario = db.query(Usuario).filter(Usuario.id == inscr.usuario_id).first()
+        email = usuario.email if usuario else None
+        nome = usuario.nome if usuario else None
+    
+    # Atualizar status
+    inscr.status = "cancelada"
+    inscr.sincronizado = False
+    db.commit()
+    
+    # Enviar email de cancelamento em background
+    if email and "@" in email:
+        background_tasks.add_task(
+            enviar_email_sync,
+            to=email,
+            template="cancelamento",
+            data={
+                "nome": nome,
+                "evento": evento.nome if evento else "Evento"
+            }
+        )
+    
+    return {"message": "Inscrição cancelada com sucesso"}
 
 
 @app.get("/evento/{evento_id}", response_model=list[schemas.InscricaoOut])
@@ -166,7 +243,6 @@ def obter_inscricao(
     return inscr
 
 
-
 @app.get("/evento/{evento_id}/estatisticas")
 def estatisticas_inscricoes(
     evento_id: UUID,
@@ -214,6 +290,7 @@ def estatisticas_inscricoes(
         "taxa_cancelamento": round((total_canceladas / total_inscricoes * 100) if total_inscricoes > 0 else 0, 2)
     }
 
+
 @app.get("/evento/{evento_id}/inscritos")
 def listar_inscritos_evento(
     evento_id: UUID,
@@ -249,6 +326,7 @@ def listar_inscritos_evento(
             })
 
     return inscritos
+
 
 if __name__ == "__main__":
     import uvicorn

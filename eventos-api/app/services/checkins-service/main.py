@@ -3,7 +3,7 @@ Microsserviço de Check-ins
 Porta: 8006
 """
 import hashlib
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from passlib.context import CryptContext
@@ -21,7 +21,7 @@ from app.shared.core.security import (
     require_service_api_key
 )
 from app.shared.models.ingresso import Ingresso
-from app.shared.models.evento import Evento
+from app.shared.helpers.email_helper import enviar_email_sync
 
 app = FastAPI(title="Checkins Service", version="1.0.0")
 add_common_middlewares(app, audit=True)
@@ -34,6 +34,7 @@ def registrar_checkin(
     inscricao_id: UUID,
     ingresso_id: UUID,
     usuario_id: UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
 ):
@@ -62,6 +63,10 @@ def registrar_checkin(
             detail="Check-in já registrado para este ingresso"
         )
     
+    # Buscar dados para email
+    evento = db.query(Evento).filter(Evento.id == inscr.evento_id).first()
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    
     try:
         check = Checkin(
             inscricao_id=inscricao_id,
@@ -75,13 +80,25 @@ def registrar_checkin(
         db.add(inscr)
 
         db.commit()
+        
+        # Enviar email de check-in em background
+        if usuario and evento:
+            background_tasks.add_task(
+                enviar_email_sync,
+                to=usuario.email,
+                template="checkin",
+                data={
+                    "nome": usuario.nome,
+                    "evento": evento.nome
+                }
+            )
+        
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao registrar check-in: {e}"
         )
-
     
     return {
         "id": str(check.id),
@@ -96,6 +113,7 @@ def checkin_rapido(
     nome: str,
     cpf: str,
     email: str,
+    background_tasks: BackgroundTasks,
     ingresso_id: UUID | None = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("checkins", "atendente", "administrador"))
@@ -103,15 +121,6 @@ def checkin_rapido(
     """
     Cria inscrição rápida, usuário rápido (caso não exista) e registra check-in.
     Fluxo completo para check-in de pessoas sem cadastro prévio.
-    
-    Fluxo:
-    - Email, nome e CPF obrigatórios
-    - Senha temporária é gerada automaticamente
-    - Se usuário já existir (mesmo email), usa o existente
-    - Cria inscrição automática no evento
-    - Registra check-in imediatamente
-    
-    REQUER: API Key + JWT + Role (atendente OU administrador)
     """
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
@@ -197,6 +206,18 @@ def checkin_rapido(
         )
         db.add(check)
         db.commit()
+        
+        # Enviar email de check-in em background
+        if email and "@" in email:
+            background_tasks.add_task(
+                enviar_email_sync,
+                to=email,
+                template="checkin",
+                data={
+                    "nome": nome,
+                    "evento": evento.nome
+                }
+            )
         
     except HTTPException:
         raise
