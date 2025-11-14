@@ -1,3 +1,9 @@
+"""
+==============================================
+CHECKINS SERVICE - checkins_service.py
+Porta: 8006
+==============================================
+"""
 import hashlib
 import logging
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -84,7 +90,7 @@ def registrar_checkin(
                     template="checkin",
                     data={
                         "nome": usuario.nome,
-                        "evento": evento.nome
+                        "evento": evento.titulo
                     }
                 )
         except Exception as email_error:
@@ -211,7 +217,7 @@ def checkin_rapido(
                     template="checkin",
                     data={
                         "nome": nome,
-                        "evento": evento.nome
+                        "evento": evento.titulo
                     }
                 )
         except Exception as email_error:

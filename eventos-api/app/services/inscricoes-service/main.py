@@ -68,7 +68,7 @@ def criar_inscricao_normal(
                 template="inscricao",
                 data={
                     "nome": usuario.nome,
-                    "evento": evento.nome
+                    "evento": evento.titulo
                 }
             )
     except Exception as email_error:
@@ -132,7 +132,7 @@ def criar_inscricao_rapida(
                 template="inscricao",
                 data={
                     "nome": payload.nome_rapido,
-                    "evento": evento.nome
+                    "evento": evento.titulo
                 }
             )
     except Exception as email_error:
@@ -188,7 +188,7 @@ def cancelar_inscricao(
                 template="cancelamento",
                 data={
                     "nome": nome,
-                    "evento": evento.nome if evento else "Evento"
+                    "evento": evento.titulo if evento else "Evento"
                 }
             )
     except Exception as email_error:
