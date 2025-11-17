@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { fetchEventosServer } from "@/lib/api";
 
 export default async function EventosPage() {
