@@ -1,6 +1,6 @@
 import { getCurrentUser, fetchEventos, fetchMinhasInscricoes } from "@/lib/api";
 import { redirect } from "next/navigation";
-import EventosList from "../certificados/EventosList";
+import EventosList from "../components/EventosList";
 
 export const dynamic = "force-dynamic";
 
