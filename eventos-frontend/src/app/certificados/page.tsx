@@ -1,6 +1,6 @@
 import { getCurrentUser, fetchMeusCertificados } from "@/lib/api";
 import { redirect } from "next/navigation";
-import CertificadoCard from "./CertificadoCard";
+import CertificadoCard from "../components/CertificadoCard";
 
 export const dynamic = "force-dynamic";
 
