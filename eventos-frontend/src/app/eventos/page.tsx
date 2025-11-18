@@ -47,12 +47,6 @@ export default async function EventosPage() {
             </div>
             <div className="flex items-center space-x-4">
               <a
-                href="/minhas-inscricoes"
-                className="text-gray-700 hover:text-gray-900"
-              >
-                Minhas Inscrições
-              </a>
-              <a
                 href="certificados"
                 className="text-gray-700 hover:text-gray-900"
               >
