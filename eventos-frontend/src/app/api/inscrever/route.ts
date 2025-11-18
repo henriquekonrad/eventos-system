@@ -6,12 +6,14 @@ export async function POST(req: NextRequest) {
   const { evento_id, usuario_id } = body;
 
   try {
-    const api = createServerApi(req);
+    const api = await createServerApi();
+
     const r = await api.post(
       `${process.env.NEXT_PUBLIC_INSCRICOES_URL}/`,
       null,
       { params: { evento_id, usuario_id } }
     );
+
     return NextResponse.json(r.data, { status: 201 });
   } catch (err: any) {
     return NextResponse.json(
