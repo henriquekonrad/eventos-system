@@ -25,6 +25,11 @@ function FormContent() {
         body: JSON.stringify({ email, senha }),
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Resposta inválida do servidor");
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -37,7 +42,8 @@ function FormContent() {
         router.push(redirect);
       }
     } catch (err: any) {
-      setError(err.message);
+      console.error("Erro no login:", err);
+      setError(err.message || "Erro ao conectar com o servidor");
     } finally {
       setLoading(false);
     }

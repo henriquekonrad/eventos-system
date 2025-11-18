@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
   const { email, senha } = await req.json();
 
   try {
+    // Login no microsserviço
     const r = await axios.post(
       `${AUTH_URL}/login`,
       { email, senha },
@@ -17,23 +18,75 @@ export async function POST(req: NextRequest) {
 
     const token = r.data?.access_token;
 
-    const res = NextResponse.json({ ok: true });
-    res.headers.set(
-      "Set-Cookie",
-      cookie.serialize("access_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 45,
-        sameSite: "lax",
-        path: "/",
-      })
-    );
+    if (!token) {
+      return NextResponse.json(
+        { message: "Token não recebido do servidor" },
+        { status: 500 }
+      );
+    }
 
-    return res;
+    // Buscar dados do usuário para verificar se precisa completar cadastro
+    try {
+      const userResponse = await axios.get(
+        `${AUTH_URL}/me?token=${token}`,
+        { headers: { "x-api-key": SERVICE_API_KEY } }
+      );
+
+      const userData = userResponse.data;
+      const requiresCompletion = !userData.nome || userData.nome.trim() === "";
+
+      // Criar resposta com cookie
+      const res = NextResponse.json({ 
+        ok: true,
+        requiresCompletion,
+        user: userData
+      });
+
+      res.headers.set(
+        "Set-Cookie",
+        cookie.serialize("access_token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 45,
+          sameSite: "lax",
+          path: "/",
+        })
+      );
+
+      return res;
+    } catch (userErr) {
+      // Se falhar ao buscar usuário, logar mas continuar
+      console.error("Erro ao buscar dados do usuário:", userErr);
+      
+      const res = NextResponse.json({ 
+        ok: true,
+        requiresCompletion: false
+      });
+
+      res.headers.set(
+        "Set-Cookie",
+        cookie.serialize("access_token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 45,
+          sameSite: "lax",
+          path: "/",
+        })
+      );
+
+      return res;
+    }
+
   } catch (err: any) {
+    console.error("Erro no login:", err.response?.data || err.message);
+    const errorMessage = err.response?.data?.detail || 
+                        err.response?.data?.message || 
+                        err.message || 
+                        "Erro ao fazer login";
+
     return NextResponse.json(
-      { message: err?.response?.data || "Erro" },
-      { status: 401 }
+      { message: errorMessage },  // ✅ Sempre uma string
+      { status: err.response?.status || 401 }
     );
   }
 }
