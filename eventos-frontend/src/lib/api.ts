@@ -12,13 +12,24 @@ const INGRESSOS_URL = process.env.NEXT_PUBLIC_INGRESSOS_URL || "http://localhost
 const CHECKINS_URL = process.env.NEXT_PUBLIC_CHECKINS_URL || "http://localhost:8006";
 const CERTIFICADOS_URL = process.env.NEXT_PUBLIC_CERTIFICADOS_URL || "http://localhost:8007";
 
+const API_KEYS = {
+  AUTH: process.env.NEXT_PUBLIC_AUTH_API_KEY || "",
+  EVENTOS: process.env.NEXT_PUBLIC_EVENTOS_API_KEY || "",
+  USUARIOS: process.env.NEXT_PUBLIC_USUARIOS_API_KEY || "",
+  INSCRICOES: process.env.NEXT_PUBLIC_INSCRICOES_API_KEY || "",
+  INGRESSOS: process.env.NEXT_PUBLIC_INGRESSOS_API_KEY || "",
+  CHECKINS: process.env.NEXT_PUBLIC_CHECKINS_API_KEY || "",
+  CERTIFICADOS: process.env.NEXT_PUBLIC_CERTIFICADOS_API_KEY || "",
+  EMAIL: process.env.NEXT_PUBLIC_EMAIL_API_KEY || "",
+};
+
 // Cliente API para Server Components
-export async function createServerApi() {
+export async function createServerApi(service: keyof typeof API_KEYS) {
   const cookieStore = await cookies();
   const token = cookieStore.get("access_token")?.value;
 
   const headers: Record<string, string> = {
-    "x-api-key": SERVICE_API_KEY,
+    "x-api-key": API_KEYS[service],
   };
 
   if (token) {
@@ -27,14 +38,13 @@ export async function createServerApi() {
 
   return axios.create({
     headers,
-    validateStatus: () => true, // Não lançar erro automaticamente
+    validateStatus: () => true,
   });
 }
 
-// Cliente API para Client Components (browser)
-export function createClientApi(token?: string) {
+export function createClientApi(service: keyof typeof API_KEYS, token?: string) {
   const headers: Record<string, string> = {
-    "x-api-key": SERVICE_API_KEY,
+    "x-api-key": API_KEYS[service],
   };
 
   if (token) {
@@ -57,7 +67,7 @@ export async function getCurrentUser() {
     
     if (!token) return null;
 
-    const api = await createServerApi();
+    const api = await createServerApi("AUTH");
     const response = await api.get(`${AUTH_URL}/me?token=${token}`);
     
     if (response.status === 200) {
@@ -89,7 +99,7 @@ export async function fetchEventosPublicos() {
 // Buscar todos os eventos (requer autenticação)
 export async function fetchEventos() {
   try {
-    const api = await createServerApi();
+    const api = await createServerApi("EVENTOS");
     const response = await api.get(`${EVENTOS_URL}/eventos`);
     
     if (response.status === 200) {
@@ -105,7 +115,7 @@ export async function fetchEventos() {
 // Buscar evento específico
 export async function fetchEvento(id: string) {
   try {
-    const api = await createServerApi();
+    const api = await createServerApi("EVENTOS");
     const response = await api.get(`${EVENTOS_URL}/eventos/${id}`);
     
     if (response.status === 200) {
@@ -121,7 +131,7 @@ export async function fetchEvento(id: string) {
 // Buscar inscrições do usuário
 export async function fetchMinhasInscricoes(usuarioId: string) {
   try {
-    const api = await createServerApi();
+    const api = await createServerApi("INSCRICOES");
     const response = await api.get(`${INSCRICOES_URL}/usuario/${usuarioId}`);
     
     if (response.status === 200) {
@@ -137,7 +147,7 @@ export async function fetchMinhasInscricoes(usuarioId: string) {
 // Buscar certificados do usuário
 export async function fetchMeusCertificados() {
   try {
-    const api = await createServerApi();
+    const api = await createServerApi("CERTIFICADOS");
     const response = await api.get(`${CERTIFICADOS_URL}/meus`);
     
     if (response.status === 200) {
@@ -153,7 +163,7 @@ export async function fetchMeusCertificados() {
 // Verificar se usuário tem check-in em um evento
 export async function verificarCheckin(inscricaoId: string) {
   try {
-    const api = await createServerApi();
+    const api = await createServerApi("CHECKINS");
     const response = await api.get(`${CHECKINS_URL}/inscricao/${inscricaoId}`);
     
     if (response.status === 200) {
