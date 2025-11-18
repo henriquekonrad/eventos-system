@@ -75,10 +75,11 @@ export async function POST(req: NextRequest) {
         "Set-Cookie",
         cookie.serialize("access_token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: false,
           maxAge: 60 * 60 * 24 * 45,
           sameSite: "lax",
           path: "/",
+          domain: undefined,
         })
       );
 
@@ -97,10 +98,11 @@ export async function POST(req: NextRequest) {
         "Set-Cookie",
         cookie.serialize("access_token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: false,
           maxAge: 60 * 60 * 24 * 45,
           sameSite: "lax",
           path: "/",
+          domain: undefined,
         })
       );
 
@@ -137,10 +139,11 @@ export async function DELETE() {
     "Set-Cookie",
     cookie.serialize("access_token", "", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 0,
+      secure: false,
+      maxAge: 60 * 60 * 24 * 45,
       sameSite: "lax",
       path: "/",
+      domain: undefined,
     })
   );
   return res;
