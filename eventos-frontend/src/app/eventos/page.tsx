@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EventosPage() {
   const user = await getCurrentUser();
-
+  
   if (!user) {
     redirect("/login");
   }
@@ -16,6 +16,15 @@ export default async function EventosPage() {
     fetchEventos(),
     fetchMinhasInscricoes(user.id),
   ]);
+
+  // Filtrar apenas eventos ativos e futuros
+  const eventosAtivos = eventos.filter((evento: any) => {
+    const dataInicio = new Date(evento.inicio_em);
+    const agora = new Date();
+    
+    // Evento deve estar ativo E não ter passado ainda
+    return evento.ativo && dataInicio > agora;
+  });
 
   // Criar um Set com IDs dos eventos que o usuário já está inscrito
   const eventosInscritosIds = new Set(
@@ -34,13 +43,13 @@ export default async function EventosPage() {
             </div>
             <div className="flex items-center space-x-4">
               <a
-                href="/app/minhas-inscricoes"
+                href="minhas-inscricoes"
                 className="text-gray-700 hover:text-gray-900"
               >
                 Minhas Inscrições
               </a>
               <a
-                href="/app/certificados"
+                href="certificados"
                 className="text-gray-700 hover:text-gray-900"
               >
                 Certificados
@@ -68,7 +77,7 @@ export default async function EventosPage() {
                 <p className="text-sm text-yellow-700">
                   Você ainda não completou seu cadastro.{" "}
                   <a
-                    href="/app/completar-cadastro"
+                    href="completar-cadastro"
                     className="font-medium underline hover:text-yellow-600"
                   >
                     Clique aqui para completar
@@ -84,13 +93,13 @@ export default async function EventosPage() {
             Eventos Disponíveis
           </h2>
 
-          {eventos.length === 0 ? (
+          {eventosAtivos.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500">Nenhum evento disponível no momento.</p>
             </div>
           ) : (
             <EventosList
-              eventos={eventos}
+              eventos={eventosAtivos}
               eventosInscritosIds={eventosInscritosIds}
               usuarioId={user.id}
             />

@@ -6,7 +6,7 @@ import { useState, Suspense } from "react";
 function FormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/app/eventos";
+  const redirect = searchParams.get("redirect") || "eventos";
 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -37,7 +37,7 @@ function FormContent() {
       }
 
       if (data.requiresCompletion) {
-        router.push("/app/completar-cadastro");
+        router.push("completar-cadastro");
       } else {
         router.push(redirect);
       }

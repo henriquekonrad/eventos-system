@@ -20,18 +20,18 @@ export default async function CertificadosPage() {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <a
-                href="/app/eventos"
+                href="eventos"
                 className="text-xl font-semibold hover:text-indigo-600"
               >
                 Sistema de Eventos
               </a>
             </div>
             <div className="flex items-center space-x-4">
-              <a href="/app/eventos" className="text-gray-700 hover:text-gray-900">
+              <a href="eventos" className="text-gray-700 hover:text-gray-900">
                 Eventos
               </a>
               <a
-                href="/app/minhas-inscricoes"
+                href="minhas-inscricoes"
                 className="text-gray-700 hover:text-gray-900"
               >
                 Minhas Inscrições
@@ -78,7 +78,7 @@ export default async function CertificadosPage() {
               </p>
               <div className="mt-6">
                 <a
-                  href="/app/eventos"
+                  href="eventos"
                   className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
                 >
                   Ver Eventos
