@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   const { evento_id, usuario_id } = body;
 
   try {
-    const api = await createServerApi();
+    const api = await createServerApi("INSCRICOES");
 
     const r = await api.post(
       `${process.env.NEXT_PUBLIC_INSCRICOES_URL}/`,
