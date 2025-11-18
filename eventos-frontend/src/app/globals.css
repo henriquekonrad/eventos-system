@@ -1,4 +1,8 @@
-* {
+@import "@tailwindcss/postcss/base";
+@import "@tailwindcss/postcss/components";
+@import "@tailwindcss/postcss/utilities";
+
+*{
   margin: 0;
   padding: 0;
   box-sizing: border-box;
