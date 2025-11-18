@@ -1,11 +1,10 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function ValidarCertificadoPage() {
+// Componente interno que usa useSearchParams
+function ValidarCertificadoContent() {
   const searchParams = useSearchParams();
   const codigoUrl = searchParams.get("codigo");
 
@@ -37,7 +36,7 @@ export default function ValidarCertificadoPage() {
         `${process.env.NEXT_PUBLIC_CERTIFICADOS_URL}/codigo/${codigoFinal}`,
         {
           headers: {
-            "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "",
+            "x-api-key": process.env.NEXT_PUBLIC_CERTIFICADOS_API_KEY || "",
           },
         }
       );
@@ -224,5 +223,27 @@ export default function ValidarCertificadoPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Componente de fallback para loading
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center">
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente principal que envolve tudo em Suspense
+export default function ValidarCertificadoPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ValidarCertificadoContent />
+    </Suspense>
   );
 }

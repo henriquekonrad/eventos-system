@@ -3,7 +3,7 @@ import axios from "axios";
 import cookie from "cookie";
 
 const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL;
-const SERVICE_API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+const SERVICE_API_KEY = process.env.NEXT_PUBLIC_AUTH_API_KEY;
 
 export async function POST(req: NextRequest) {
   const { email, senha } = await req.json();
