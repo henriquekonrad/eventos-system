@@ -1,4 +1,3 @@
-from dataclasses import Field
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
@@ -13,9 +12,9 @@ class UsuarioCreate(BaseModel):
     papel: Optional[str] = None
 
 class CompletarCadastroIn(BaseModel):
-    nome: Optional[str] = Field(None, min_length=1, max_length=200)
-    cpf: Optional[str] = Field(None, min_length=11, max_length=11)
-    senha: Optional[str] = Field(None, min_length=6)
+    nome: Optional[str]
+    cpf: Optional[str]
+    senha: Optional[str]
 
 class UsuarioOut(BaseModel):
     id: UUID
