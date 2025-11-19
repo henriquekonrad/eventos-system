@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 
 const SERVICE_API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
 
-// URLs dos microsserviços
 const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:8001";
 const EVENTOS_URL = process.env.NEXT_PUBLIC_EVENTOS_URL || "http://localhost:8002";
 const USUARIOS_URL = process.env.NEXT_PUBLIC_USUARIOS_URL || "http://localhost:8003";
@@ -23,7 +22,6 @@ const API_KEYS = {
   EMAIL: process.env.NEXT_PUBLIC_EMAIL_API_KEY || "",
 };
 
-// Cliente API para Server Components
 export async function createServerApi(service: keyof typeof API_KEYS) {
   const cookieStore = await cookies();
   const token = cookieStore.get("access_token")?.value;
@@ -57,15 +55,15 @@ export function createClientApi(service: keyof typeof API_KEYS, token?: string) 
   });
 }
 
-// === FUNÇÕES HELPER PARA SERVER COMPONENTS ===
-
 // Buscar usuário atual
 export async function getCurrentUser() {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get("access_token")?.value;
     
-    if (!token) return null;
+    if (!token) {
+      return null;
+    }
 
     const api = await createServerApi("AUTH");
     const response = await api.get(`${AUTH_URL}/me?token=${token}`);
@@ -91,7 +89,7 @@ export async function fetchEventosPublicos() {
     );
     return response.data;
   } catch (error) {
-    console.error("Erro ao buscar eventos:", error);
+    console.error("Erro ao buscar eventos públicos:", error);
     return [];
   }
 }
@@ -103,11 +101,16 @@ export async function fetchEventos() {
     const response = await api.get(`${EVENTOS_URL}/eventos`);
     
     if (response.status === 200) {
-      return response.data;
+      const eventos = Array.isArray(response.data) ? response.data : [];
+      return eventos;
     }
     return [];
-  } catch (error) {
-    console.error("Erro ao buscar eventos:", error);
+  } catch (error: any) {
+    console.error("❌ Erro ao buscar eventos:", error.message);
+    if (error.response) {
+      console.error("📡 Response status:", error.response.status);
+      console.error("📦 Response data:", error.response.data);
+    }
     return [];
   }
 }
@@ -131,15 +134,22 @@ export async function fetchEvento(id: string) {
 // Buscar inscrições do usuário
 export async function fetchMinhasInscricoes(usuarioId: string) {
   try {
+    console.log("🔍 Buscando inscrições do usuário:", usuarioId);
+    
     const api = await createServerApi("INSCRICOES");
     const response = await api.get(`${INSCRICOES_URL}/usuario/${usuarioId}`);
     
+    console.log("📡 Status:", response.status);
+    console.log("📦 Inscrições recebidas:", response.data);
+    
     if (response.status === 200) {
-      return response.data;
+      const inscricoes = Array.isArray(response.data) ? response.data : [];
+      console.log("✅ Total de inscrições:", inscricoes.length);
+      return inscricoes;
     }
     return [];
-  } catch (error) {
-    console.error("Erro ao buscar inscrições:", error);
+  } catch (error: any) {
+    console.error("❌ Erro ao buscar inscrições:", error.message);
     return [];
   }
 }
