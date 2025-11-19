@@ -25,7 +25,6 @@ class CheckinView(ctk.CTkFrame):
     def _setup_ui(self):
         self._create_top_bar()
         self._create_search_frame()
-        self._create_quick_registration_button()
         self._create_info_area()
         self._create_action_buttons()
     
@@ -65,6 +64,9 @@ class CheckinView(ctk.CTkFrame):
             width=300
         )
         self.cpf_entry.pack(side="left", padx=(0,8))
+        
+        # Bind Enter key
+        self.cpf_entry.bind("<Return>", lambda e: self._on_search_click())
 
         buscar_btn = ctk.CTkButton(
             search_frame, 
@@ -74,63 +76,71 @@ class CheckinView(ctk.CTkFrame):
         )
         buscar_btn.pack(side="left", padx=4)
     
-    def _create_quick_registration_button(self):
-        """Botão de inscrição rápida"""
-        rapida_btn = ctk.CTkButton(
-            self, 
-            text="Inscrição Rápida + Check-in (sem cadastro)", 
-            command=self._on_quick_registration_click,
-            height=40,
-            fg_color=UIConfig.COLOR_RAPIDA,
-            hover_color="darkorange"
-        )
-        rapida_btn.pack(padx=8, pady=(4,8), fill="x")
-    
     def _create_info_area(self):
         """Informações"""
         info_frame = ctk.CTkFrame(self)
         info_frame.pack(fill="both", expand=True, padx=8, pady=8)
         
-        self.info_text = ctk.CTkTextbox(info_frame, height=200)
+        self.info_text = ctk.CTkTextbox(info_frame, height=200, font=("Arial", 12))
         self.info_text.pack(fill="both", expand=True, padx=8, pady=8)
-        self.info_text.insert("0.0", "Selecione um evento e busque por CPF ou faça inscrição rápida.")
+        self.info_text.insert("0.0", "Selecione um evento e busque por CPF.")
         self.info_text.configure(state="disabled")
     
     def _create_action_buttons(self):
-        """Botões"""
+        """Botões de ação"""
         actions = ctk.CTkFrame(self)
         actions.pack(fill="x", padx=8, pady=8)
         
+        # Botão CHECK-IN NORMAL (verde) - para quem JÁ TEM INSCRIÇÃO
         self.checkin_btn = ctk.CTkButton(
             actions, 
-            text="Registrar Check-in (já tem inscrição)", 
+            text="✓ Check-in Normal (JÁ INSCRITO)", 
             command=self._on_checkin_click, 
             state="disabled",
-            height=40,
+            height=50,
+            font=("Arial", 13, "bold"),
             fg_color=UIConfig.COLOR_SUCCESS,
             hover_color="darkgreen"
         )
-        self.checkin_btn.pack(side="left", fill="x", expand=True, padx=(0,4))
+        self.checkin_btn.pack(fill="x", padx=4, pady=(0, 8))
         
+        # Separador visual
+        separator = ctk.CTkFrame(actions, height=2, fg_color="gray")
+        separator.pack(fill="x", padx=4, pady=8)
+        
+        # Botão INSCRIÇÃO RÁPIDA (laranja) - para quem NÃO TEM CADASTRO
+        self.rapida_btn = ctk.CTkButton(
+            actions, 
+            text="⚡ Inscrição Rápida + Check-in (SEM CADASTRO)", 
+            command=self._on_quick_registration_click,
+            height=50,
+            font=("Arial", 13, "bold"),
+            fg_color=UIConfig.COLOR_RAPIDA,
+            hover_color="darkorange"
+        )
+        self.rapida_btn.pack(fill="x", padx=4, pady=(0, 8))
+        
+        # Botão Ver Pendentes
         self.show_pending_btn = ctk.CTkButton(
             actions, 
             text="Ver Pendentes", 
             command=self._on_show_pending_click,
-            height=40
+            height=35
         )
-        self.show_pending_btn.pack(side="left", padx=4)
+        self.show_pending_btn.pack(fill="x", padx=4)
     
     def _on_search_click(self):
         """Handler: Busca por CPF"""
         if not self.current_evento_id:
-            self._update_info("ERRO: Selecione um evento primeiro!")
+            self._update_info("❌ ERRO: Selecione um evento primeiro!")
             return
         
         cpf = self.cpf_entry.get().strip()
-        print("cpf:",cpf)
         if not cpf:
-            self._update_info("Digite um CPF válido")
+            self._update_info("⚠️ Digite um CPF válido")
             return
+        
+        print(f"[VIEW] Buscando CPF: {cpf}")
         
         # Busca inscrito
         inscrito = self.inscrito_repo.find_by_cpf(cpf, self.current_evento_id)
@@ -150,10 +160,12 @@ class CheckinView(ctk.CTkFrame):
         self._show_participante_encontrado(inscrito)
     
     def _on_checkin_click(self):
-        """Handler: Registra check-in normal"""
+        """Handler: Registra check-in normal (para quem JÁ TEM INSCRIÇÃO)"""
         if not self.found_inscricao:
-            self._update_info("ERRO: Nenhuma inscrição selecionada.")
+            self._update_info("❌ ERRO: Nenhuma inscrição selecionada.")
             return
+        
+        print(f"[VIEW] Registrando check-in normal para: {self.found_inscricao['nome']}")
         
         sucesso, mensagem = self.checkin_service.registrar_checkin_normal(
             inscricao_id=self.found_inscricao['inscricao_id'],
@@ -169,22 +181,27 @@ class CheckinView(ctk.CTkFrame):
             self._limpar_estado()
     
     def _on_quick_registration_click(self):
-        """Handler: Abre dialog de inscrição rápida"""
+        """Handler: Abre dialog de inscrição rápida (para quem NÃO TEM CADASTRO)"""
         if not self.current_evento_id:
-            self._update_info("ERRO: Selecione um evento primeiro!")
+            self._update_info("❌ ERRO: Selecione um evento primeiro!")
             return
+        
+        # Pega CPF digitado (se houver) para pré-preencher
+        cpf_inicial = self.cpf_entry.get().strip()
+        
+        print(f"[VIEW] Abrindo dialog de inscrição rápida")
         
         dialog = InscricaoRapidaDialog(
             parent=self,
             evento_id=self.current_evento_id,
-            cpf_inicial=self.cpf_entry.get().strip(),
+            cpf_inicial=cpf_inicial,
             on_success=self._on_quick_registration_success
         )
         dialog.show()
     
     def _on_sync_click(self):
         """Handler: Sincroniza pendentes"""
-        self._update_info("Sincronizando requisições pendentes...\n\nAguarde...")
+        self._update_info("🔄 Sincronizando requisições pendentes...\n\nAguarde...")
         self.update()
         
         resultado = self.sync_service.processar_pendentes()
@@ -207,22 +224,33 @@ class CheckinView(ctk.CTkFrame):
     
     def _on_pending_removed(self, request_id: int):
         """Pendência removida"""
-        self._update_info("Operação removida da fila.")
+        self._update_info("✓ Operação removida da fila.")
     
     
     def _show_participante_encontrado(self, inscrito: dict):
         """Exibe informações do participante encontrado"""
         self.found_inscricao = inscrito
         
-        info = f"""PARTICIPANTE ENCONTRADO (JÁ TEM INSCRIÇÃO)
+        # Verifica se é cadastro completo ou temporário
+        tipo_cadastro = "COMPLETO" if inscrito['sincronizado'] else "TEMPORÁRIO/LOCAL"
+        
+        info = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ PARTICIPANTE ENCONTRADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 Nome: {inscrito['nome']}
 CPF: {inscrito['cpf']}
 Email: {inscrito['email']}
-ID Inscrição: {inscrito['inscricao_id']}
-Status: {'Sincronizado' if inscrito['sincronizado'] else 'Pendente sync'}
+Tipo: {tipo_cadastro}
 
-Este participante JÁ ESTÁ INSCRITO no evento.
-Clique em "Registrar Check-in" para fazer o check-in normal."""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ESTE PARTICIPANTE JÁ ESTÁ INSCRITO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Clique no botão VERDE para fazer 
+  o check-in normal
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
         
         self._update_info(info)
         self.checkin_btn.configure(state="normal")
@@ -231,22 +259,41 @@ Clique em "Registrar Check-in" para fazer o check-in normal."""
         """Exibe mensagem quando participante não é encontrado"""
         self.found_inscricao = None
         
-        info = f"""✗ PARTICIPANTE NÃO ENCONTRADO
+        info = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✗ PARTICIPANTE NÃO ENCONTRADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CPF: {cpf}
 Evento: {self.current_evento_nome}
 
 Este CPF NÃO está inscrito neste evento.
 
-OPÇÕES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Se a pessoa NÃO TEM CADASTRO:
-   → Use "Inscrição Rápida" (botão laranja)
+COMO PROCEDER?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ NÃO use o botão verde
+   (pessoa não tem inscrição)
+
+✓ Use o botão LARANJA:
+  "Inscrição Rápida + Check-in"
+  
+  → Isso vai criar um cadastro 
+     temporário para a pessoa
+  
+  → Ela poderá completar o 
+     cadastro depois no site
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ ATENÇÃO: Se a pessoa diz que
+   já se inscreveu no site:
    
-2. Se a pessoa JÁ TEM CADASTRO:
-   → Ela precisa se inscrever no evento primeiro
-   
-3. Verifique se o CPF está correto"""
+   • Verifique se o CPF está correto
+   • Verifique se inscreveu neste evento
+   • Sincronize os inscritos novamente
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
         
         self._update_info(info)
         self.checkin_btn.configure(state="disabled")
@@ -256,43 +303,56 @@ OPÇÕES:
         self.found_inscricao = None
         
         if sincronizado:
-            status = "CHECK-IN JÁ REGISTRADO NO SERVIDOR"
+            status = "✓ CHECK-IN JÁ REGISTRADO NO SERVIDOR"
+            substatus = "Confirmado no servidor"
         else:
-            status = "CHECK-IN JÁ REGISTRADO (LOCALMENTE)"
+            status = "⚠️ CHECK-IN JÁ REGISTRADO (LOCALMENTE)"
+            substatus = "Aguardando sincronização"
         
-        info = f"""{status}
+        info = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{status}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Nome: {inscrito['nome']}
 CPF: {inscrito['cpf']}
 
-✓ Esta pessoa JÁ FEZ CHECK-IN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ ESTA PESSOA JÁ FEZ CHECK-IN
 → PODE ENTRAR NO EVENTO
 
-{'Confirmado no servidor' if sincronizado else 'Aguardando sincronização'}"""
+{substatus}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
         
         self._update_info(info)
         self.checkin_btn.configure(state="disabled")
     
     def _formatar_resultado_sync(self, resultado: dict) -> str:
         """Formata resultado da sincronização"""
-        msg = "RESULTADO DA SINCRONIZAÇÃO\n\n"
+        msg = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "RESULTADO DA SINCRONIZAÇÃO\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
         if resultado['sucesso'] > 0:
-            msg += f"{resultado['sucesso']} operação(ões) sincronizada(s)\n\n"
+            msg += f"✓ {resultado['sucesso']} operação(ões) sincronizada(s)\n\n"
         
         if resultado['ja_feito'] > 0:
-            msg += f"ℹ{resultado['ja_feito']} check-in(s) já realizado(s)\n"
+            msg += f"ℹ️ {resultado['ja_feito']} check-in(s) já realizado(s)\n"
             msg += "→ Essas pessoas podem entrar normalmente\n\n"
         
         if resultado['removidos'] > 0:
-            msg += f"{resultado['removidos']} erro(s) permanente(s) removido(s)\n\n"
+            msg += f"🗑️ {resultado['removidos']} erro(s) permanente(s) removido(s)\n\n"
         
         if resultado['falhas'] > 0:
-            msg += f"{resultado['falhas']} operação(ões) ainda pendente(s)\n\n"
+            msg += f"⚠️ {resultado['falhas']} operação(ões) ainda pendente(s)\n\n"
         
         if resultado['total_pendentes'] == 0:
-            msg += "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            msg += "✓ Todas as operações foram processadas!"
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            msg += "✓ Todas as operações foram processadas!\n"
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        else:
+            msg += f"📊 Total ainda pendente: {resultado['total_pendentes']}"
         
         return msg
     
@@ -315,6 +375,23 @@ CPF: {inscrito['cpf']}
         """Define evento atual (chamado pela MainView)"""
         self.current_evento_id = evento_id
         self.current_evento_nome = evento_nome
-        self.event_label.configure(text=f"{evento_nome}")
-        self._update_info(f"Evento selecionado: {evento_nome}\n\nBusque por CPF ou faça inscrição rápida.")
+        self.event_label.configure(text=f"📍 {evento_nome}")
+        
+        info_inicial = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EVENTO SELECIONADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{evento_nome}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COMO FAZER CHECK-IN?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Digite o CPF do participante
+2. Clique em "Buscar"
+3. O sistema mostrará as opções
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+        
+        self._update_info(info_inicial)
         self._limpar_estado()
