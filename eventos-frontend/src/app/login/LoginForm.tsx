@@ -6,7 +6,7 @@ import { useState, Suspense } from "react";
 function FormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/app/eventos";
+  const redirect = searchParams.get("redirect") || "eventos";
 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -37,7 +37,7 @@ function FormContent() {
       }
 
       if (data.requiresCompletion) {
-        router.push("/app/completar-cadastro");
+        router.push("completar-cadastro");
       } else {
         router.push(redirect);
       }
@@ -117,13 +117,23 @@ function FormContent() {
             </button>
           </div>
 
-          <div className="text-center">
-            <a
-              href="/eventos-publicos"
-              className="font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              Ver eventos públicos
-            </a>
+          <div className="text-center space-y-2">
+            <div>
+              <a
+                href="/registrar"
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Não tem conta? Cadastre-se
+              </a>
+            </div>
+            <div>
+              <a
+                href="/eventos-publicos"
+                className="font-medium text-gray-600 hover:text-gray-500"
+              >
+                Ver eventos públicos
+              </a>
+            </div>
           </div>
         </form>
       </div>

@@ -11,6 +11,11 @@ class UsuarioCreate(BaseModel):
     cpf: Optional[str] = None
     papel: Optional[str] = None
 
+class CompletarCadastroIn(BaseModel):
+    nome: Optional[str] = Field(None, min_length=1, max_length=200)
+    cpf: Optional[str] = Field(None, min_length=11, max_length=11)
+    senha: Optional[str] = Field(None, min_length=6)
+
 class UsuarioOut(BaseModel):
     id: UUID
     nome: str

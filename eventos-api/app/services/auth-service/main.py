@@ -2,11 +2,13 @@
 Microsserviço de Autenticação
 Porta: 8001
 """
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from typing import Optional
+from uuid import UUID
 
 from app.shared.core.database import get_db
 from app.shared.models.usuario import Usuario
@@ -42,7 +44,35 @@ def verificar_token(token: str):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido"
         )
+
+
+def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """Helper para extrair usuário do token JWT"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token não fornecido"
+        )
     
+    token = authorization.replace("Bearer ", "")
+    payload = verificar_token(token)
+    user_id = payload.get("sub")
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido"
+        )
+    
+    user = db.query(Usuario).filter(Usuario.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário não encontrado"
+        )
+    
+    return user
+
 
 @app.post("/login", response_model=schemas.Token)
 def login(
@@ -69,6 +99,119 @@ def login(
     })
     
     return {"access_token": token, "token_type": "bearer"}
+
+
+@app.post("/registrar", status_code=status.HTTP_201_CREATED)
+def registrar(
+    data: schemas.UsuarioCreate,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("auth"))
+):
+    """
+    Registra um novo usuário no sistema.
+    
+    REQUER: API Key (sem JWT - é um registro público)
+    """
+    # Verificar se email já existe
+    if db.query(Usuario).filter(Usuario.email == data.email).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email já cadastrado"
+        )
+    
+    # Verificar se CPF já existe (se fornecido)
+    if data.cpf and db.query(Usuario).filter(Usuario.cpf == data.cpf).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CPF já cadastrado"
+        )
+    
+    # Criar novo usuário
+    novo_usuario = Usuario(
+        nome=data.nome,
+        email=data.email,
+        cpf=data.cpf,
+        senha_hash=pwd.hash(data.senha),
+        papel="participante",  # Novos registros sempre começam como participante
+        email_verificado=False
+    )
+    
+    db.add(novo_usuario)
+    db.commit()
+    db.refresh(novo_usuario)
+    
+    return {
+        "id": str(novo_usuario.id),
+        "nome": novo_usuario.nome,
+        "email": novo_usuario.email,
+        "papel": novo_usuario.papel
+    }
+
+
+@app.patch("/completar-cadastro")
+def completar_cadastro(
+    data: schemas.CompletarCadastroIn,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("auth")),
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Completa o cadastro de um usuário 'rápido'.
+    Permite atualizar nome, CPF e senha.
+    
+    REQUER: API Key + JWT
+    """
+    # Verificar se é usuário rápido
+    if current_user.papel != "rapido":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas usuários rápidos podem completar cadastro"
+        )
+    
+    # Atualizar nome se fornecido
+    if data.nome:
+        current_user.nome = data.nome.strip()
+    
+    # Atualizar CPF se fornecido
+    if data.cpf:
+        # Verificar se CPF já existe em outro usuário
+        cpf_existente = db.query(Usuario).filter(
+            Usuario.cpf == data.cpf,
+            Usuario.id != current_user.id
+        ).first()
+        
+        if cpf_existente:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CPF já cadastrado para outro usuário"
+            )
+        
+        current_user.cpf = data.cpf
+    
+    # Atualizar senha se fornecida
+    if data.senha:
+        if len(data.senha) < 6:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A senha deve ter no mínimo 6 caracteres"
+            )
+        current_user.senha_hash = pwd.hash(data.senha)
+    
+    # Mudar papel para participante (sai de "rapido")
+    current_user.papel = "participante"
+    current_user.email_verificado = True
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    return {
+        "id": str(current_user.id),
+        "nome": current_user.nome,
+        "email": current_user.email,
+        "cpf": current_user.cpf,
+        "papel": current_user.papel,
+        "message": "Cadastro completado com sucesso!"
+    }
 
 
 @app.post("/validar-token")
@@ -121,6 +264,7 @@ def me(
         "id": str(user.id),
         "nome": user.nome,
         "email": user.email,
+        "cpf": user.cpf,
         "papel": user.papel
     }
 

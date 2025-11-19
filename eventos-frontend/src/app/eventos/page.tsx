@@ -34,13 +34,13 @@ export default async function EventosPage() {
             </div>
             <div className="flex items-center space-x-4">
               <a
-                href="/app/minhas-inscricoes"
+                href="minhas-inscricoes"
                 className="text-gray-700 hover:text-gray-900"
               >
                 Minhas Inscrições
               </a>
               <a
-                href="/app/certificados"
+                href="certificados"
                 className="text-gray-700 hover:text-gray-900"
               >
                 Certificados
@@ -68,7 +68,7 @@ export default async function EventosPage() {
                 <p className="text-sm text-yellow-700">
                   Você ainda não completou seu cadastro.{" "}
                   <a
-                    href="/app/completar-cadastro"
+                    href="completar-cadastro"
                     className="font-medium underline hover:text-yellow-600"
                   >
                     Clique aqui para completar
