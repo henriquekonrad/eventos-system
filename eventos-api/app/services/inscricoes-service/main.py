@@ -28,7 +28,7 @@ def criar_inscricao_normal(
     evento_id: UUID,
     usuario_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
+    api_key: None = Depends(require_service_api_key("inscricoes"))
 ):
     """
     Cria uma inscrição normal para um usuário já cadastrado
@@ -149,7 +149,7 @@ def criar_inscricao_rapida(
 def cancelar_inscricao(
     inscricao_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente"))
+    api_key: None = Depends(require_service_api_key("inscricoes"))
 ):
     """
     Cancela uma inscrição existente.
