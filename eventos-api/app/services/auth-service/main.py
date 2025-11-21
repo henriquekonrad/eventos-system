@@ -87,7 +87,20 @@ def login(
     """
     user = db.query(Usuario).filter(Usuario.email == data.email).first()
     
-    if not user or not pwd.verify(data.senha, user.senha_hash):
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
+        )
+    
+    # Verificar se é usuário rápido
+    if user.papel == "rapido":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Este é um usuário rápido. Por favor, cadastre uma nova senha para acessar o sistema."
+        )
+    
+    if not pwd.verify(data.senha, user.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais inválidas"
@@ -266,6 +279,113 @@ def me(
         "email": user.email,
         "cpf": user.cpf,
         "papel": user.papel
+    }
+
+
+@app.get("/verificar-usuario-rapido")
+def verificar_usuario_rapido(
+    email: str,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("auth"))
+):
+    """
+    Verifica se um email pertence a um usuário rápido.
+    
+    REQUER: API Key
+    """
+    user = db.query(Usuario).filter(Usuario.email == email).first()
+    
+    if not user:
+        return {
+            "isRapido": False,
+            "message": "Usuário não encontrado"
+        }
+    
+    if user.papel == "rapido":
+        return {
+            "isRapido": True,
+            "usuario": {
+                "id": str(user.id),
+                "nome": user.nome,
+                "email": user.email,
+                "cpf": user.cpf
+            }
+        }
+    
+    return {
+        "isRapido": False,
+        "message": "Usuário não é rápido"
+    }
+
+
+@app.post("/cadastrar-senha-rapido")
+def cadastrar_senha_rapido(
+    data: schemas.CadastrarSenhaRapidoIn,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("auth"))
+):
+    """
+    Permite que um usuário rápido cadastre uma senha e complete seu cadastro.
+    
+    REQUER: API Key
+    """
+    # Buscar usuário pelo email
+    user = db.query(Usuario).filter(Usuario.email == data.email).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário não encontrado"
+        )
+    
+    # Verificar se é usuário rápido
+    if user.papel != "rapido":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Este endpoint é apenas para usuários rápidos"
+        )
+    
+    # Atualizar dados
+    user.nome = data.nome.strip()
+    
+    if data.cpf:
+        # Verificar se CPF já existe em outro usuário
+        cpf_existente = db.query(Usuario).filter(
+            Usuario.cpf == data.cpf,
+            Usuario.id != user.id
+        ).first()
+        
+        if cpf_existente:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CPF já cadastrado para outro usuário"
+            )
+        
+        user.cpf = data.cpf
+    
+    # Atualizar senha
+    if len(data.senha) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A senha deve ter no mínimo 6 caracteres"
+        )
+    
+    user.senha_hash = pwd.hash(data.senha)
+    
+    # Mudar papel para participante
+    user.papel = "participante"
+    user.email_verificado = True
+    
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "id": str(user.id),
+        "nome": user.nome,
+        "email": user.email,
+        "cpf": user.cpf,
+        "papel": user.papel,
+        "message": "Senha cadastrada e cadastro completado com sucesso!"
     }
 
 

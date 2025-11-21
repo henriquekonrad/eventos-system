@@ -16,6 +16,12 @@ class CompletarCadastroIn(BaseModel):
     cpf: Optional[str]
     senha: Optional[str]
 
+class CadastrarSenhaRapidoIn(BaseModel):
+    email: EmailStr
+    nome: str
+    cpf: Optional[str]
+    senha: str
+
 class UsuarioOut(BaseModel):
     id: UUID
     nome: str

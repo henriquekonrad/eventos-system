@@ -6,12 +6,13 @@ import { useState, Suspense } from "react";
 function FormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "eventos";
+  const redirect = searchParams.get("redirect") || "/app/eventos";
 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isRapidUser, setIsRapidUser] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,13 +38,21 @@ function FormContent() {
       }
 
       if (data.requiresCompletion) {
-        router.push("completar-cadastro");
+        router.push("/app/completar-cadastro");
       } else {
         router.push(redirect);
       }
     } catch (err: any) {
       console.error("Erro no login:", err);
-      setError(err.message || "Erro ao conectar com o servidor");
+      
+      // Verificar se o erro é de usuário rápido
+      if (err.message && err.message.includes("usuário rápido")) {
+        setIsRapidUser(true);
+        setError("Você foi cadastrado rapidamente no evento. Clique em 'Cadastrar Nova Senha' para acessar o sistema.");
+      } else {
+        setError(err.message || "Erro ao conectar com o servidor");
+        setIsRapidUser(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -98,10 +107,12 @@ function FormContent() {
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
+            <div className={`rounded-md p-4 ${isRapidUser ? 'bg-blue-50' : 'bg-red-50'}`}>
               <div className="flex">
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                  <h3 className={`text-sm font-medium ${isRapidUser ? 'text-blue-800' : 'text-red-800'}`}>
+                    {error}
+                  </h3>
                 </div>
               </div>
             </div>
@@ -116,6 +127,18 @@ function FormContent() {
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </div>
+
+          {isRapidUser && email && (
+            <div>
+              <button
+                type="button"
+                onClick={() => router.push(`/cadastrar-senha?email=${encodeURIComponent(email)}`)}
+                className="group relative w-full flex justify-center py-2 px-4 border border-indigo-600 text-sm font-medium rounded-md text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Cadastrar Nova Senha
+              </button>
+            </div>
+          )}
 
           <div className="text-center space-y-2">
             <div>
