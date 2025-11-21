@@ -28,10 +28,11 @@ def criar_inscricao_normal(
     evento_id: UUID,
     usuario_id: UUID,
     db: Session = Depends(get_db),
-    api_key: None = Depends(require_service_api_key("inscricoes"))
+    current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "administrador", "atendente", "participante"))
 ):
     """
-    Cria uma inscrição normal para um usuário já cadastrado
+    Cria uma inscrição normal para um usuário já cadastrado.
+    Se já existir inscrição cancelada, reativa ela.
     """
     evento = db.query(Evento).filter(Evento.id == evento_id).first()
     if not evento:
@@ -41,14 +42,42 @@ def criar_inscricao_normal(
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
+    # Verifica se já existe inscrição
     existente = db.query(Inscricao).filter(
         Inscricao.evento_id == evento_id,
         Inscricao.usuario_id == usuario_id
     ).first()
     
     if existente:
-        raise HTTPException(status_code=400, detail="Usuário já inscrito neste evento")
+        # Se está ativa, retorna erro
+        if existente.status == "ativa":
+            raise HTTPException(status_code=400, detail="Usuário já inscrito neste evento")
+        
+        # Se está cancelada, reativa
+        if existente.status == "cancelada":
+            existente.status = "ativa"
+            existente.cancelado_em = None
+            existente.sincronizado = False
+            db.commit()
+            db.refresh(existente)
+            
+            # Enviar email de confirmação
+            try:
+                if usuario.email and "@" in usuario.email:
+                    enviar_email_sync(
+                        to=usuario.email,
+                        template="inscricao",
+                        data={
+                            "nome": usuario.nome,
+                            "evento": evento.titulo
+                        }
+                    )
+            except Exception as email_error:
+                logger.warning(f"Erro ao enviar email: {email_error}")
+            
+            return {"inscricao_id": str(existente.id), "message": "Inscrição reativada com sucesso"}
     
+    # Cria nova inscrição
     inscr = Inscricao(
         evento_id=evento_id,
         usuario_id=usuario_id,
@@ -200,16 +229,24 @@ def cancelar_inscricao(
 @app.get("/evento/{evento_id}", response_model=list[schemas.InscricaoOut])
 def listar_inscricoes_por_evento(
     evento_id: UUID,
+    apenas_ativas: bool = True,
     db: Session = Depends(get_db),
     api_key: None = Depends(require_service_api_key("inscricoes"))
 ):
     """
     Lista todas as inscrições de um evento específico.
-    Útil para relatórios e gestão de participantes.
+    
+    Query params:
+    - apenas_ativas: se True (padrão), retorna apenas inscrições ativas
     
     REQUER: API Key (sem JWT - permite consulta para sistemas de gestão)
     """
-    return db.query(Inscricao).filter(Inscricao.evento_id == evento_id).all()
+    query = db.query(Inscricao).filter(Inscricao.evento_id == evento_id)
+    
+    if apenas_ativas:
+        query = query.filter(Inscricao.status == "ativa")
+    
+    return query.all()
 
 
 @app.get("/usuario/{usuario_id}", response_model=list[schemas.InscricaoOut])
@@ -295,36 +332,53 @@ def estatisticas_inscricoes(
 @app.get("/evento/{evento_id}/inscritos")
 def listar_inscritos_evento(
     evento_id: UUID,
+    incluir_canceladas: bool = False,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_jwt_and_service_key("inscricoes", "atendente", "administrador"))
 ):
     """
-    Lista os inscritos de um evento com detalhes básicos:
-    id da inscrição, nome, CPF e email.
+    Lista os inscritos de um evento com detalhes básicos.
+    Por padrão, não inclui inscrições canceladas.
 
     REQUER: API Key + JWT + Role (atendente OU administrador)
+    
+    Query params:
+    - incluir_canceladas: se True, inclui inscrições canceladas (default: False)
     """
-    inscricoes = db.query(Inscricao).filter(Inscricao.evento_id == evento_id).all()
+    query = db.query(Inscricao).filter(Inscricao.evento_id == evento_id)
+    
+    # Por padrão, filtra apenas ativas
+    if not incluir_canceladas:
+        query = query.filter(Inscricao.status == "ativa")
+    
+    inscricoes = query.all()
+    
     if not inscricoes:
         return []
 
     inscritos = []
     for i in inscricoes:
+        inscrito_data = {
+            "id": str(i.id),
+            "status": i.status,
+            "inscricao_rapida": i.inscricao_rapida
+        }
+        
         if not i.inscricao_rapida:
             usuario = db.query(Usuario).filter(Usuario.id == i.usuario_id).first()
-            inscritos.append({
-                "id": str(i.id),
-                "nome": usuario.nome,
-                "cpf": usuario.cpf,
-                "email": usuario.email
+            inscrito_data.update({
+                "nome": usuario.nome if usuario else None,
+                "cpf": usuario.cpf if usuario else None,
+                "email": usuario.email if usuario else None
             })
         else:
-            inscritos.append({
-                "id": str(i.id),
+            inscrito_data.update({
                 "nome": i.nome_rapido,
                 "cpf": i.cpf_rapido,
                 "email": i.email_rapido
             })
+        
+        inscritos.append(inscrito_data)
 
     return inscritos
 

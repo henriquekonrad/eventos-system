@@ -161,7 +161,8 @@ def obter_certificado_por_inscricao(
 @app.get("/codigo/{codigo}")
 def obter_por_codigo(
     codigo: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("certificados"))
 ):
     """
     Endpoint PÚBLICO para validação de certificados.

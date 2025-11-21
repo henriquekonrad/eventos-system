@@ -1,13 +1,16 @@
 import axios from "axios";
 
 const CERTIFICADOS_URL = process.env.NEXT_PUBLIC_CERTIFICADOS_URL;
+const CERTIFICADOS_API_KEY = process.env.NEXT_PUBLIC_CERTIFICADOS_API_KEY;
 
 async function fetchCertificado(codigo: string) {
   try {
-    // Endpoint público - não precisa de API key
-    const r = await axios.get(`${CERTIFICADOS_URL}/codigo/${codigo}`);
+    const r = await axios.get(`${CERTIFICADOS_URL}/codigo/${codigo}`, {
+      headers: { "x-api-key": CERTIFICADOS_API_KEY }
+    });
     return r.data;
-  } catch {
+  } catch (err: any) {
+    console.error("Erro ao buscar certificado:", err.response?.data || err.message);
     return null;
   }
 }

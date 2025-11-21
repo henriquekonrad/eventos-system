@@ -27,13 +27,11 @@ class CheckinService:
         """
         Verifica se check-in existe por CPF em um evento.
         """
-        # Busca inscrição por CPF
         inscrito = self.inscrito_repo.find_by_cpf(cpf, evento_id)
         
         if not inscrito:
             return None
         
-        # Verifica se tem check-in
         checkin_status = self.checkin_repo.exists_by_inscricao(inscrito['inscricao_id'])
         
         if not checkin_status:
@@ -45,17 +43,38 @@ class CheckinService:
             "inscricao_id": inscrito['inscricao_id']
         }
     
+    def verificar_inscricao_cancelada(self, inscricao_id: str, evento_id: str) -> bool:
+        """
+        Verifica se inscrição está cancelada (localmente).
+        Retorna True se cancelada.
+        """
+        inscrito = self.inscrito_repo.find_by_id(inscricao_id)
+        if inscrito and inscrito.get('status') == 'cancelada':
+            return True
+        return False
+    
     def registrar_checkin_normal(
         self, 
         inscricao_id: str, 
         evento_id: str,
         nome: str,
         cpf: str,
-        email: str
+        email: str,
+        status: str = "ativa"  # Novo parâmetro
     ) -> Tuple[bool, str]:
         """
         Registra check-in para inscrição existente.
         """
+        # NOVO: Verifica se inscrição está cancelada
+        if status == "cancelada":
+            return (False, f"""❌ INSCRIÇÃO CANCELADA
+
+CPF: {cpf}
+Nome: {nome}
+
+Esta inscrição foi CANCELADA.
+A pessoa precisa se inscrever novamente pelo site.""")
+        
         # Verifica se já tem check-in
         checkin_status = self.checkin_repo.exists_by_inscricao(inscricao_id)
         
@@ -88,7 +107,6 @@ class CheckinService:
         headers = self.api_service.get_auth_headers()
         headers["x-api-key"] = APIKeys.CHECKINS
         
-        # Adiciona à fila
         self.pending_repo.create(
             method="POST",
             url=url,
@@ -98,7 +116,6 @@ class CheckinService:
             related_cpf=cpf
         )
         
-        # Registra localmente
         self.checkin_repo.create(
             inscricao_id=inscricao_id,
             ingresso_id=ingresso_id,
@@ -120,7 +137,6 @@ class CheckinService:
         """
         Registra check-in rápido (pessoa sem cadastro).
         """
-        # Verifica se já existe check-in por CPF
         checkin_status = self.verificar_checkin_por_cpf(cpf, evento_id)
         
         if checkin_status:
@@ -129,9 +145,20 @@ class CheckinService:
             else:
                 return (False, "CHECK-IN JÁ REGISTRADO (LOCALMENTE)\n→ PODE ENTRAR")
         
-        # VERIFICA SE CPF JÁ TEM CADASTRO (bloqueio crítico!)
+        # VERIFICA SE CPF JÁ TEM CADASTRO
         inscrito = self.inscrito_repo.find_by_cpf(cpf, evento_id)
-        if inscrito and inscrito['sincronizado'] == 1:
+        if inscrito and inscrito.get('sincronizado') == 1:
+            # NOVO: Verifica se está cancelada
+            if inscrito.get('status') == 'cancelada':
+                msg = f"""❌ INSCRIÇÃO CANCELADA
+
+CPF: {cpf}
+Nome no sistema: {inscrito['nome']}
+
+Esta pessoa tinha inscrição, mas CANCELOU.
+Ela precisa se inscrever novamente pelo site."""
+                return (False, msg)
+            
             msg = f"""❌ NÃO É POSSÍVEL USAR INSCRIÇÃO RÁPIDA
 
 CPF: {cpf}
@@ -141,10 +168,8 @@ Este CPF JÁ TEM CADASTRO!
 Use o check-in normal (botão verde)."""
             return (False, msg)
         
-        # Cria ID local temporário
         local_id = str(uuid.uuid4())
         
-        # Salva inscrito local
         self.inscrito_repo.create(
             inscricao_id=local_id,
             evento_id=evento_id,
@@ -154,12 +179,10 @@ Use o check-in normal (botão verde)."""
             sincronizado=0
         )
         
-        # Prepara requisição para endpoint /rapido
         url = f"{APIConfig.CHECKINS}/rapido?evento_id={evento_id}&nome={nome}&cpf={cpf}&email={email}"
         headers = self.api_service.get_auth_headers()
         headers["x-api-key"] = APIKeys.CHECKINS
         
-        # Adiciona à fila
         self.pending_repo.create(
             method="POST",
             url=url,
@@ -169,7 +192,6 @@ Use o check-in normal (botão verde)."""
             related_cpf=cpf
         )
         
-        # Registra check-in local
         self.checkin_repo.create(
             inscricao_id=local_id,
             ingresso_id=None,
@@ -192,11 +214,9 @@ Os dados serão sincronizados com o servidor.""")
     def remover_checkin_e_pendencias(self, inscricao_id: str) -> Tuple[bool, str]:
         """
         Remove check-in local e pendências relacionadas.
-        Usado quando atendente cancela operação.
         """
         self.checkin_repo.delete_by_inscricao(inscricao_id)
         
-        # Verifica se deve remover inscrito (se for local/rápido)
         inscrito = self.inscrito_repo.find_by_id(inscricao_id)
         if inscrito and inscrito['sincronizado'] == 0:
             self.inscrito_repo.delete(inscricao_id)
