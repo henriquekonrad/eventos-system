@@ -117,7 +117,7 @@ function FormContent() {
       });
 
       if (loginResponse.ok) {
-        router.push("/app/eventos");
+        router.push("eventos");
       } else {
         router.push("/login?message=Senha cadastrada com sucesso! Faça login.");
       }
