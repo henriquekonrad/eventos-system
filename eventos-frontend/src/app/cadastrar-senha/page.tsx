@@ -1,4 +1,4 @@
-import CadastrarSenhaForm from "./CadastrarSenhaForm.tsx";
+import CadastrarSenhaForm from "./CadastrarSenhaForm";
 
 export default function CadastrarSenhaPage() {
   return (
