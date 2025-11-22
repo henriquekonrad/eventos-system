@@ -12,6 +12,7 @@ from app.shared.core.database import get_db
 from app.shared.models.certificado import Certificado
 from app.shared.models.inscricao import Inscricao
 from app.shared.models.checkin import Checkin
+from app.shared.models.usuario import Usuario
 from app.shared import schemas
 from app.shared.middlewares.add import add_common_middlewares
 from app.shared.core.security import (
@@ -34,8 +35,6 @@ def emitir_certificado(
     """
     Emite um certificado para uma inscrição.
     Requer que o participante tenha feito check-in.
-    
-    REQUER: API Key + JWT + Role (atendente OU administrador)
     """
     inscr = db.query(Inscricao).filter(
         Inscricao.id == payload.inscricao_id,
@@ -43,18 +42,12 @@ def emitir_certificado(
     ).first()
     
     if not inscr:
-        raise HTTPException(
-            status_code=404,
-            detail="Inscrição não encontrada para este evento"
-        )
+        raise HTTPException(status_code=404, detail="Inscrição não encontrada para este evento")
     
     check = db.query(Checkin).filter(Checkin.inscricao_id == payload.inscricao_id).first()
     
     if not check:
-        raise HTTPException(
-            status_code=400,
-            detail="Não é possível emitir certificado sem registro de presença (check-in)"
-        )
+        raise HTTPException(status_code=400, detail="Não é possível emitir certificado sem registro de presença (check-in)")
     
     cert_existente = db.query(Certificado).filter(
         Certificado.inscricao_id == payload.inscricao_id,
@@ -62,10 +55,7 @@ def emitir_certificado(
     ).first()
     
     if cert_existente:
-        raise HTTPException(
-            status_code=400,
-            detail="Certificado já foi emitido para esta inscrição"
-        )
+        raise HTTPException(status_code=400, detail="Certificado já foi emitido para esta inscrição")
     
     codigo = secrets.token_urlsafe(12)
     
@@ -85,30 +75,130 @@ def emitir_certificado(
     return cert
 
 
-@app.get("/codigo/{codigo}", response_model=schemas.CertificadoOut)
+@app.post("/emitir-automatico/{inscricao_id}", status_code=status.HTTP_201_CREATED)
+def emitir_certificado_automatico(
+    inscricao_id: UUID,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("certificados"))
+):
+    """
+    Emite certificado automaticamente após check-in.
+    Chamado internamente pelo checkins-service.
+    """
+    inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
+    
+    if not inscr:
+        raise HTTPException(status_code=404, detail="Inscrição não encontrada")
+    
+    # Verificar se já existe certificado
+    cert_existente = db.query(Certificado).filter(
+        Certificado.inscricao_id == inscricao_id
+    ).first()
+    
+    if cert_existente:
+        return cert_existente  # Já existe, retorna o existente
+    
+    # Verificar se tem check-in
+    check = db.query(Checkin).filter(Checkin.inscricao_id == inscricao_id).first()
+    
+    if not check:
+        raise HTTPException(status_code=400, detail="Check-in não encontrado")
+    
+    codigo = secrets.token_urlsafe(12)
+    
+    cert = Certificado(
+        inscricao_id=inscricao_id,
+        evento_id=inscr.evento_id,
+        codigo_certificado=codigo,
+        emitido_em=datetime.datetime.utcnow(),
+        caminho_pdf=None,
+        revogado=False
+    )
+    
+    db.add(cert)
+    db.commit()
+    db.refresh(cert)
+    
+    return {
+        "id": str(cert.id),
+        "codigo_certificado": cert.codigo_certificado,
+        "message": "Certificado emitido automaticamente"
+    }
+
+
+@app.get("/inscricao/{inscricao_id}/evento/{evento_id}")
+def obter_certificado_por_inscricao(
+    inscricao_id: UUID,
+    evento_id: UUID,
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("certificados"))
+):
+    """
+    Busca certificado por inscrição e evento.
+    """
+    cert = db.query(Certificado).filter(
+        Certificado.inscricao_id == inscricao_id,
+        Certificado.evento_id == evento_id
+    ).first()
+    
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificado não encontrado")
+    
+    # Buscar dados do evento para enriquecer resposta
+    evento = db.query(Evento).filter(Evento.id == evento_id).first()
+    
+    return {
+        "id": str(cert.id),
+        "inscricao_id": str(cert.inscricao_id),
+        "evento_id": str(cert.evento_id),
+        "codigo_certificado": cert.codigo_certificado,
+        "emitido_em": cert.emitido_em,
+        "revogado": cert.revogado,
+        "evento_titulo": evento.titulo if evento else None
+    }
+
+
+@app.get("/codigo/{codigo}")
 def obter_por_codigo(
     codigo: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: None = Depends(require_service_api_key("certificados"))
 ):
     """
     Endpoint PÚBLICO para validação de certificados.
     Permite verificar autenticidade sem login.
-    Útil para empresas validarem certificados de candidatos.
-    
-    REQUER: Nada (público para validação externa)
     """
-    c = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
+    cert = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
     
-    if not c:
+    if not cert:
         raise HTTPException(status_code=404, detail="Certificado não encontrado")
     
-    if c.revogado:
-        raise HTTPException(
-            status_code=400,
-            detail="Certificado revogado/inválido"
-        )
+    # Buscar dados do evento e usuário
+    evento = db.query(Evento).filter(Evento.id == cert.evento_id).first()
+    inscricao = db.query(Inscricao).filter(Inscricao.id == cert.inscricao_id).first()
     
-    return c
+    usuario = None
+    if inscricao:
+        if inscricao.inscricao_rapida:
+            usuario = {"nome": inscricao.nome_rapido}
+        else:
+            user = db.query(Usuario).filter(Usuario.id == inscricao.usuario_id).first()
+            usuario = {"nome": user.nome if user else None}
+    
+    return {
+        "id": str(cert.id),
+        "codigo_certificado": cert.codigo_certificado,
+        "emitido_em": cert.emitido_em,
+        "revogado": cert.revogado,
+        "evento": {
+            "id": str(evento.id) if evento else None,
+            "titulo": evento.titulo if evento else None,
+            "inicio_em": evento.inicio_em if evento else None,
+            "local": evento.local if evento else None
+        },
+        "participante": usuario,
+        "valido": not cert.revogado
+    }
 
 
 @app.get("/meus", response_model=list[schemas.CertificadoOut])
@@ -119,9 +209,6 @@ def listar_meus_certificados(
 ):
     """
     Lista todos os certificados do usuário autenticado.
-    O usuário vê apenas seus próprios certificados.
-    
-    REQUER: API Key + JWT (qualquer usuário logado)
     """
     certs = (
         db.query(Certificado)
@@ -129,7 +216,6 @@ def listar_meus_certificados(
         .filter(Inscricao.usuario_id == current_user.id)
         .all()
     )
-    
     return certs
 
 
@@ -141,12 +227,8 @@ def listar_certificados_por_evento(
 ):
     """
     Lista todos os certificados emitidos para um evento.
-    Útil para gerar relatórios de participação.
-    
-    REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    certs = db.query(Certificado).filter(Certificado.evento_id == evento_id).all()
-    return certs
+    return db.query(Certificado).filter(Certificado.evento_id == evento_id).all()
 
 
 @app.post("/revogar/{codigo}")
@@ -157,30 +239,19 @@ def revogar_certificado(
 ):
     """
     Revoga um certificado (torna-o inválido).
-    Usado em casos de fraude ou erro na emissão.
-    
-    REQUER: API Key + JWT + Role (atendente OU administrador)
     """
-    c = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
+    cert = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
     
-    if not c:
+    if not cert:
         raise HTTPException(status_code=404, detail="Certificado não encontrado")
     
-    if c.revogado:
-        raise HTTPException(
-            status_code=400,
-            detail="Certificado já estava revogado"
-        )
+    if cert.revogado:
+        raise HTTPException(status_code=400, detail="Certificado já estava revogado")
     
-    c.revogado = True
-    db.add(c)
+    cert.revogado = True
     db.commit()
     
-    return {
-        "message": "Certificado revogado com sucesso",
-        "codigo": codigo,
-        "revogado_em": datetime.datetime.utcnow()
-    }
+    return {"message": "Certificado revogado com sucesso", "codigo": codigo}
 
 
 @app.get("/{certificado_id}", response_model=schemas.CertificadoOut)
@@ -191,9 +262,6 @@ def obter_certificado(
 ):
     """
     Obtém um certificado pelo ID.
-    Útil para buscar certificado por identificador interno.
-    
-    REQUER: API Key (sem JWT - permite busca por ID)
     """
     cert = db.query(Certificado).filter(Certificado.id == certificado_id).first()
     

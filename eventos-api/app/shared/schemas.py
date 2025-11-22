@@ -11,6 +11,17 @@ class UsuarioCreate(BaseModel):
     cpf: Optional[str] = None
     papel: Optional[str] = None
 
+class CompletarCadastroIn(BaseModel):
+    nome: Optional[str]
+    cpf: Optional[str]
+    senha: Optional[str]
+
+class CadastrarSenhaRapidoIn(BaseModel):
+    email: EmailStr
+    nome: str
+    cpf: Optional[str]
+    senha: str
+
 class UsuarioOut(BaseModel):
     id: UUID
     nome: str

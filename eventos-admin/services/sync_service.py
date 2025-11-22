@@ -52,13 +52,14 @@ class SyncService:
     # INSCRITOS
     
     def sincronizar_inscritos_evento(self, evento_id: str) -> bool:
-        """Sincroniza inscritos de um evento específico"""
+        """Sincroniza inscritos de um evento específico (incluindo status)"""
         if not self.api_service.is_online():
             print("[SYNC] Offline: não é possível sincronizar inscritos")
             return False
         
         try:
-            inscritos = self.api_service.listar_inscritos_evento(evento_id)
+            # Inclui canceladas para o app saber quais estão canceladas
+            inscritos = self.api_service.listar_inscritos_evento(evento_id, incluir_canceladas=True)
             
             if inscritos is None:
                 print("[SYNC] Erro ao buscar inscritos da API")
@@ -75,7 +76,8 @@ class SyncService:
                     nome=inscrito.get("nome", ""),
                     cpf=inscrito.get("cpf", ""),
                     email=inscrito.get("email", ""),
-                    sincronizado=1
+                    sincronizado=1,
+                    status=inscrito.get("status", "ativa")  # NOVO: inclui status
                 )
             
             print(f"[SYNC] ✓ Sincronizados {len(inscritos)} inscritos do evento")
@@ -84,7 +86,7 @@ class SyncService:
         except Exception as e:
             print(f"[SYNC] ✗ Erro ao sincronizar inscritos: {e}")
             return False
-    
+        
     # PENDENTES
     
     def processar_pendentes(self) -> Dict:

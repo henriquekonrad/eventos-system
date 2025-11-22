@@ -154,10 +154,22 @@ class APIService:
             return None
     
     # INSCRIÇÕES
-    
-    def listar_inscritos_evento(self, evento_id: str) -> Optional[list]:
-        """Lista inscritos de um evento"""
+
+    def listar_inscritos_evento(self, evento_id: str, incluir_canceladas: bool = True) -> Optional[list]:
+        """
+        Lista inscritos de um evento.
+        
+        Args:
+            evento_id: ID do evento
+            incluir_canceladas: Se True, inclui inscrições canceladas 
+                            (necessário para o app saber quem cancelou)
+        """
         url = f"{APIConfig.INSCRICOES}/evento/{evento_id}/inscritos"
+        
+        # Adiciona query param para incluir canceladas
+        if incluir_canceladas:
+            url += "?incluir_canceladas=true"
+        
         headers = self.get_auth_headers()
         headers["x-api-key"] = APIKeys.INSCRICOES
         
