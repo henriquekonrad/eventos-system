@@ -6,7 +6,7 @@ const CERTIFICADOS_API_KEY = process.env.NEXT_PUBLIC_CERTIFICADOS_API_KEY;
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { codigo: string } }
+  { params }: { params: Promise<{ codigo: string }> }
 ) {
   const { codigo } = await params;
   
