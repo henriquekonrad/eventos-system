@@ -165,40 +165,70 @@ def obter_por_codigo(
     api_key: None = Depends(require_service_api_key("certificados"))
 ):
     """
-    Endpoint PÚBLICO para validação de certificados.
-    Permite verificar autenticidade sem login.
+    Endpoint para validação de certificados.
     """
-    cert = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
+    print(f"=== BUSCANDO CERTIFICADO POR CÓDIGO ===")
+    print(f"Código recebido: {codigo}")
     
-    if not cert:
-        raise HTTPException(status_code=404, detail="Certificado não encontrado")
-    
-    # Buscar dados do evento e usuário
-    evento = db.query(Evento).filter(Evento.id == cert.evento_id).first()
-    inscricao = db.query(Inscricao).filter(Inscricao.id == cert.inscricao_id).first()
-    
-    usuario = None
-    if inscricao:
-        if inscricao.inscricao_rapida:
-            usuario = {"nome": inscricao.nome_rapido}
-        else:
-            user = db.query(Usuario).filter(Usuario.id == inscricao.usuario_id).first()
-            usuario = {"nome": user.nome if user else None}
-    
-    return {
-        "id": str(cert.id),
-        "codigo_certificado": cert.codigo_certificado,
-        "emitido_em": cert.emitido_em,
-        "revogado": cert.revogado,
-        "evento": {
-            "id": str(evento.id) if evento else None,
-            "titulo": evento.titulo if evento else None,
-            "inicio_em": evento.inicio_em if evento else None,
-            "local": evento.local if evento else None
-        },
-        "participante": usuario,
-        "valido": not cert.revogado
-    }
+    try:
+        cert = db.query(Certificado).filter(Certificado.codigo_certificado == codigo).first()
+        
+        print(f"Certificado encontrado: {cert is not None}")
+        
+        if not cert:
+            raise HTTPException(status_code=404, detail="Certificado não encontrado")
+        
+        print(f"Certificado ID: {cert.id}")
+        print(f"Evento ID: {cert.evento_id}")
+        print(f"Inscrição ID: {cert.inscricao_id}")
+        
+        # Buscar dados do evento
+        evento = db.query(Evento).filter(Evento.id == cert.evento_id).first()
+        print(f"Evento encontrado: {evento is not None}")
+        
+        # Buscar dados da inscrição
+        inscricao = db.query(Inscricao).filter(Inscricao.id == cert.inscricao_id).first()
+        print(f"Inscrição encontrada: {inscricao is not None}")
+        
+        # Buscar dados do participante
+        usuario = None
+        if inscricao:
+            print(f"Inscrição rápida: {inscricao.inscricao_rapida}")
+            if inscricao.inscricao_rapida:
+                usuario = {"nome": inscricao.nome_rapido}
+                print(f"Nome rápido: {inscricao.nome_rapido}")
+            else:
+                user = db.query(Usuario).filter(Usuario.id == inscricao.usuario_id).first()
+                print(f"Usuário encontrado: {user is not None}")
+                if user:
+                    usuario = {"nome": user.nome}
+                    print(f"Nome usuário: {user.nome}")
+        
+        response = {
+            "id": str(cert.id),
+            "codigo_certificado": cert.codigo_certificado,
+            "emitido_em": cert.emitido_em.isoformat() if cert.emitido_em else None,
+            "revogado": cert.revogado,
+            "evento": {
+                "id": str(evento.id) if evento else None,
+                "titulo": evento.titulo if evento else None,
+                "inicio_em": evento.inicio_em.isoformat() if evento and evento.inicio_em else None,
+                "local": evento.local if evento else None
+            } if evento else None,
+            "participante": usuario,
+            "valido": not cert.revogado
+        }
+        
+        print(f"✅ Resposta montada com sucesso")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ ERRO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
 
 @app.get("/meus", response_model=list[schemas.CertificadoOut])

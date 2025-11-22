@@ -1,16 +1,31 @@
-import axios from "axios";
-
-const CERTIFICADOS_URL = process.env.NEXT_PUBLIC_CERTIFICADOS_URL;
-const CERTIFICADOS_API_KEY = process.env.NEXT_PUBLIC_CERTIFICADOS_API_KEY;
-
 async function fetchCertificado(codigo: string) {
+  console.log("=== VALIDANDO CERTIFICADO ===");
+  console.log("Código:", codigo);
+  
+  // Usar URL absoluta para server component
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  
   try {
-    const r = await axios.get(`${CERTIFICADOS_URL}/codigo/${codigo}`, {
-      headers: { "x-api-key": CERTIFICADOS_API_KEY }
+    const url = `${baseUrl}/api/certificado/${codigo}`;
+    console.log("URL da API interna:", url);
+    
+    const response = await fetch(url, {
+      cache: "no-store"
     });
-    return r.data;
+    
+    console.log("Status:", response.status);
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Erro:", error);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log("✅ Certificado encontrado");
+    return data;
   } catch (err: any) {
-    console.error("Erro ao buscar certificado:", err.response?.data || err.message);
+    console.error("❌ Erro:", err.message);
     return null;
   }
 }
@@ -61,7 +76,6 @@ export default async function ValidarCertificadoPage({
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Header de validação */}
         <div className={`rounded-xl shadow-lg p-8 ${isRevogado ? 'bg-red-50 border-2 border-red-200' : 'bg-green-50 border-2 border-green-200'}`}>
           <div className="flex items-center justify-center gap-4">
             {isRevogado ? (
@@ -92,7 +106,6 @@ export default async function ValidarCertificadoPage({
           </div>
         </div>
 
-        {/* Detalhes do certificado */}
         <div className="mt-6 bg-white rounded-xl shadow-lg p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-6 pb-4 border-b">
             Detalhes do Certificado
@@ -147,7 +160,6 @@ export default async function ValidarCertificadoPage({
           </div>
         </div>
 
-        {/* Rodapé */}
         <div className="mt-6 text-center text-sm text-gray-500">
           <p>Sistema de Eventos - Validação de Certificados</p>
           <p className="mt-1">

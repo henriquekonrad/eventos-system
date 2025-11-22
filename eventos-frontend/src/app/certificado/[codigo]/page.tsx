@@ -1,13 +1,33 @@
-import axios from "axios";
 import CertificadoView from "./CertificadoView";
 
-const CERTIFICADOS_URL = process.env.NEXT_PUBLIC_CERTIFICADOS_URL;
-
 async function fetchCertificado(codigo: string) {
+  console.log("=== BUSCANDO CERTIFICADO ===");
+  console.log("Código:", codigo);
+  
+  // Usar URL absoluta para server component
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  
   try {
-    const r = await axios.get(`${CERTIFICADOS_URL}/codigo/${codigo}`);
-    return r.data;
-  } catch {
+    const url = `${baseUrl}/api/certificado/${codigo}`;
+    console.log("URL da API interna:", url);
+    
+    const response = await fetch(url, {
+      cache: "no-store"
+    });
+    
+    console.log("Status:", response.status);
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Erro:", error);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log("✅ Certificado encontrado");
+    return data;
+  } catch (err: any) {
+    console.error("❌ Erro ao buscar certificado:", err.message);
     return null;
   }
 }
@@ -30,6 +50,7 @@ export default async function CertificadoPage({
               ? "Este certificado foi revogado e não é mais válido."
               : "Certificado não encontrado."}
           </p>
+          <p className="mt-2 text-sm text-gray-400">Código: {codigo}</p>
           <a href="/eventos" className="mt-4 inline-block text-indigo-600 hover:underline">
             Voltar
           </a>
