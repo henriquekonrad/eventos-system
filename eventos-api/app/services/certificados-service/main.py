@@ -212,8 +212,7 @@ def obter_por_codigo(
             "evento": {
                 "id": str(evento.id) if evento else None,
                 "titulo": evento.titulo if evento else None,
-                "inicio_em": evento.inicio_em.isoformat() if evento and evento.inicio_em else None,
-                "local": evento.local if evento else None
+                "inicio_em": evento.inicio_em.isoformat() if evento and evento.inicio_em else None
             } if evento else None,
             "participante": usuario,
             "valido": not cert.revogado
