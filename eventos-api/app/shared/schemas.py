@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 from uuid import UUID
 
-# ---------- Usuarios ----------
+# USUARIOS
 class UsuarioCreate(BaseModel):
     nome: str
     email: EmailStr
@@ -35,7 +35,7 @@ class UsuarioOut(BaseModel):
     class Config:
         orm_mode = True
 
-# ---------- Evento ----------
+# EVENTOS
 class EventoCreate(BaseModel):
     titulo: str
     descricao: Optional[str] = None
@@ -52,7 +52,7 @@ class EventoOut(BaseModel):
     class Config:
         orm_mode = True
 
-# ---------- Inscricao ----------
+# INSCRICOES
 class InscricaoCreateRapida(BaseModel):
     evento_id: UUID
     nome_rapido: str
@@ -74,7 +74,7 @@ class InscricaoOut(BaseModel):
     class Config:
         orm_mode = True
 
-# ---------- Checkin ----------
+# CHECKINS
 class CheckinCreate(BaseModel):
     inscricao_id: UUID
     ingresso_id: UUID
@@ -90,7 +90,7 @@ class CheckinOut(BaseModel):
     class Config:
         orm_mode = True
 
-# ---------- Certificado ----------
+# CERTIFICADOS
 class CertificadoCreate(BaseModel):
     inscricao_id: UUID
     evento_id: UUID
@@ -107,7 +107,7 @@ class CertificadoOut(BaseModel):
     class Config:
         orm_mode = True
 
-# ------------ Ingresso --------------
+# INGRESSOS
 class IngressoSchema(BaseModel):
     id: UUID
     inscricao_id: UUID
@@ -120,7 +120,7 @@ class IngressoSchema(BaseModel):
     class Config:
         orm_mode = True
 
-# ------------ Token --------------
+# TOKENS
 class Token(BaseModel):
     access_token: str
     token_type: str

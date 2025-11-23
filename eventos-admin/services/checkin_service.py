@@ -60,12 +60,12 @@ class CheckinService:
         nome: str,
         cpf: str,
         email: str,
-        status: str = "ativa"  # Novo parâmetro
+        status: str = "ativa" 
     ) -> Tuple[bool, str]:
         """
         Registra check-in para inscrição existente.
         """
-        # NOVO: Verifica se inscrição está cancelada
+
         if status == "cancelada":
             return (False, f"""❌ INSCRIÇÃO CANCELADA
 
@@ -148,7 +148,6 @@ A pessoa precisa se inscrever novamente pelo site.""")
         # VERIFICA SE CPF JÁ TEM CADASTRO
         inscrito = self.inscrito_repo.find_by_cpf(cpf, evento_id)
         if inscrito and inscrito.get('sincronizado') == 1:
-            # NOVO: Verifica se está cancelada
             if inscrito.get('status') == 'cancelada':
                 msg = f"""❌ INSCRIÇÃO CANCELADA
 

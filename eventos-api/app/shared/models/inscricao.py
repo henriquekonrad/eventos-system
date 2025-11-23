@@ -12,6 +12,6 @@ class Inscricao(Base):
     nome_rapido = Column(String(200), nullable=False)
     cpf_rapido = Column(String(20))
     email_rapido = Column(String(255))
-    status = Column(String(50), default="confirmada")  # ou "cancelada"
+    status = Column(String(50), default="confirmada")
     cancelado_em = Column(DateTime, nullable=True, default=None)
     sincronizado = Column(Boolean)

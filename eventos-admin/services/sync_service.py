@@ -77,7 +77,7 @@ class SyncService:
                     cpf=inscrito.get("cpf", ""),
                     email=inscrito.get("email", ""),
                     sincronizado=1,
-                    status=inscrito.get("status", "ativa")  # NOVO: inclui status
+                    status=inscrito.get("status", "ativa") 
                 )
             
             print(f"[SYNC] ✓ Sincronizados {len(inscritos)} inscritos do evento")

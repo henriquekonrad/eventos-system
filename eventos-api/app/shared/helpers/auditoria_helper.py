@@ -1,7 +1,3 @@
-"""
-shared/helpers/auditoria_helper.py
-Service Layer para lógica de auditoria
-"""
 from sqlalchemy.orm import Session
 from app.shared.models.log_auditoria import LogAuditoria
 import datetime
@@ -9,10 +5,6 @@ from typing import Optional
 
 
 class AuditoriaService:
-    """
-    Service Layer para auditoria.
-    Single Responsibility: apenas lógica de auditoria.
-    """
     
     @staticmethod
     def registrar_log(
@@ -22,14 +14,9 @@ class AuditoriaService:
         codigo_status: int,
         ip_cliente: Optional[str] = None,
         usuario_id: Optional[str] = None,
-        payload_requisicao: str = "",  # ← ADICIONAR (com default vazio)
-        payload_resposta: str = ""     # ← ADICIONAR (com default vazio)
+        payload_requisicao: str = "",
+        payload_resposta: str = ""
     ) -> LogAuditoria:
-        """
-        Registra um log de auditoria.
-        Responsabilidade única: persistir dados de auditoria.
-        """
-        # Regra de negócio: limitar tamanho dos payloads
         if len(payload_requisicao) > 5000:
             payload_requisicao = payload_requisicao[:5000] + "... (truncado)"
         

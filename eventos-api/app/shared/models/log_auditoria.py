@@ -1,4 +1,3 @@
-# app/models/log_auditoria.py
 from sqlalchemy import Column, String, DateTime, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID
 import uuid

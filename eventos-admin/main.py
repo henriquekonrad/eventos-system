@@ -70,7 +70,6 @@ def init_database():
         )
     """)
     
-    # Migrações para bancos existentes
     try:
         cursor.execute("ALTER TABLE pending_requests ADD COLUMN related_inscricao_id TEXT")
     except sqlite3.OperationalError:
@@ -80,13 +79,12 @@ def init_database():
         cursor.execute("ALTER TABLE pending_requests ADD COLUMN related_cpf TEXT")
     except sqlite3.OperationalError:
         pass
-    
-    # NOVO: Adiciona coluna status se não existir
+
     try:
         cursor.execute("ALTER TABLE inscritos ADD COLUMN status TEXT DEFAULT 'ativa'")
         print("[DB] Coluna 'status' adicionada à tabela inscritos")
     except sqlite3.OperationalError:
-        pass  # Coluna já existe
+        pass
     
     conn.commit()
     conn.close()

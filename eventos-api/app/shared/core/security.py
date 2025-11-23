@@ -1,7 +1,3 @@
-"""
-shared/core/security.py
-Funções de segurança compartilhadas entre TODOS os microsserviços
-"""
 from fastapi import Depends, HTTPException, status, Header, Request
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
@@ -55,9 +51,6 @@ def require_roles(*roles: str):
     
     Args:
         *roles: Lista de papéis permitidos (ex: "administrador", "atendente")
-    
-    Returns:
-        Função wrapper que retorna o payload do token se autorizado
     """
     def wrapper(authorization: str = Header(...)):
         payload = verificar_token_middleware(authorization)
@@ -82,9 +75,6 @@ def get_current_user_from_token(authorization: str = Header(...), db: Session = 
         @app.get("/meu-perfil")
         def perfil(user: Usuario = Depends(get_current_user_from_token)):
             return {"nome": user.nome, "email": user.email}
-    
-    Returns:
-        Objeto Usuario do SQLAlchemy
     """
     from ..models.usuario import Usuario
     
@@ -113,12 +103,7 @@ def require_api_key_and_jwt(
     authorization: str = Header(...)
 ):
     """
-    Valida TANTO API Key quanto JWT (segurança dupla).
-    
-    Uso:
-        @app.post("/super-protegido")
-        def super_protegido(auth: dict = Depends(require_api_key_and_jwt)):
-            return {"message": "Autenticado!"}
+    Valida TANTO API Key quanto JWT
     """
     # Validar API Key
     if x_api_key != API_KEY:
@@ -132,9 +117,7 @@ def require_api_key_and_jwt(
     return payload
 
 
-# ============================================
 # API KEY POR SERVIÇO
-# ============================================
 
 def require_service_api_key(service_name: str):
     """
@@ -169,17 +152,6 @@ def require_jwt_and_service_key(service_name: str, *roles: str):
     """
     Valida TANTO JWT quanto API Key do serviço.
     Também verifica o papel do usuário se roles forem fornecidas.
-    
-    Uso:
-        # Apenas JWT + API Key
-        @app.post("/eventos")
-        def criar(auth: dict = Depends(require_jwt_and_service_key("eventos"))):
-            return {"user_id": auth["sub"]}
-        
-        # JWT + API Key + Role específica
-        @app.post("/eventos")
-        def criar(auth: dict = Depends(require_jwt_and_service_key("eventos", "administrador"))):
-            return {"user_id": auth["sub"]}
     """
     def wrapper(
         request: Request, 

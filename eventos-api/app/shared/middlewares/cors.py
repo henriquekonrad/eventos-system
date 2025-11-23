@@ -1,8 +1,3 @@
-"""
-shared/middlewares/cors.py
-Middleware CORS padronizado para todos os microsserviços.
-"""
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 import os
@@ -11,10 +6,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def add_cors_middleware(app: FastAPI):
-    """
-    Adiciona o middleware CORS configurado a partir do .env.
-    Variável: ALLOWED_ORIGINS="http://localhost:3000,https://meusite.com"
-    """
     allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
 
     if allowed_origins_str == "*":

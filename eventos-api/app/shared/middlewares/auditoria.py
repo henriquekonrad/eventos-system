@@ -1,7 +1,3 @@
-"""
-shared/middlewares/auditoria.py
-Middleware de auditoria - versão com captura de payloads
-"""
 from fastapi import Request, Response
 from starlette.responses import StreamingResponse
 from app.shared.helpers.auditoria_helper import AuditoriaService
@@ -10,23 +6,7 @@ import traceback
 
 
 async def auditoria_middleware(request: Request, call_next):
-    """
-    Middleware de auditoria seguindo Single Responsibility Principle.
-    
-    Responsabilidades:
-    1. Capturar metadados da requisição/resposta
-    2. Capturar payloads (request e response bodies)
-    3. Delegar persistência ao Service Layer
-    
-    NÃO faz:
-    - Gerenciamento de sessão DB (usa sua própria)
-    - Lógica de negócio
-    - Acoplamento com outros middlewares
-    """
-    
-    # ==========================================
     # 1. CAPTURAR REQUEST BODY
-    # ==========================================
     payload_requisicao = ""
     try:
         body_bytes = await request.body()
@@ -41,9 +21,7 @@ async def auditoria_middleware(request: Request, call_next):
     except Exception as e:
         payload_requisicao = f"Erro ao capturar: {str(e)}"
     
-    # ==========================================
     # 2. CAPTURAR METADADOS
-    # ==========================================
     metodo = request.method
     caminho = request.url.path
     ip_cliente = request.client.host if request.client else None
@@ -55,28 +33,21 @@ async def auditoria_middleware(request: Request, call_next):
         if user:
             usuario_id = getattr(user, "id", None) or user.get("sub")
     
-    # ==========================================
     # 3. PROCESSAR REQUISIÇÃO
-    # ==========================================
     response = await call_next(request)
     
-    # ==========================================
     # 4. CAPTURAR RESPONSE BODY
-    # ==========================================
     payload_resposta = ""
     try:
-        # FastAPI retorna StreamingResponse por padrão
         if isinstance(response, StreamingResponse):
             response_body = b""
             
-            # Consumir o stream
             async for chunk in response.body_iterator:
                 response_body += chunk
             
             # Decodificar
             payload_resposta = response_body.decode("utf-8", errors="ignore")
             
-            # Recriar a resposta (necessário porque consumimos o stream)
             response = Response(
                 content=response_body,
                 status_code=response.status_code,
@@ -87,9 +58,7 @@ async def auditoria_middleware(request: Request, call_next):
     except Exception as e:
         payload_resposta = f"Erro ao capturar: {str(e)}"
     
-    # ==========================================
     # 5. REGISTRAR AUDITORIA
-    # ==========================================
     try:
         db = SessionLocal()
         try:

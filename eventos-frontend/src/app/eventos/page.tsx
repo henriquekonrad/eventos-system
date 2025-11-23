@@ -43,7 +43,7 @@ export default async function EventosPage() {
               </a>
               <div className="border-l border-gray-300 h-6"></div>
               <span className="text-sm text-gray-600">{user.nome}</span>
-              <form action="/api/session" method="DELETE">
+              <form action="/login" method="DELETE">
                 <button type="submit" className="text-sm text-red-600 hover:text-red-800">
                   Sair
                 </button>

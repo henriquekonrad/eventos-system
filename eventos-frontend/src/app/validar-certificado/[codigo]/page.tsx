@@ -2,7 +2,6 @@ async function fetchCertificado(codigo: string) {
   console.log("=== VALIDANDO CERTIFICADO ===");
   console.log("Código:", codigo);
   
-  // Usar URL absoluta para server component
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   
   try {

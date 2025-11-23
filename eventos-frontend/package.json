@@ -20,7 +20,7 @@
     "@biomejs/biome": "2.2.0",
     "@types/cookie": "^0.6.0",
     "@types/node": "^20",
-    "@types/react": "^19",
+    "@types/react": "^19.2.6",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.22",
     "babel-plugin-react-compiler": "1.0.0",

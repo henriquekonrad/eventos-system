@@ -10,5 +10,5 @@ class Certificado(Base):
     evento_id = Column(UUID(as_uuid=True), ForeignKey("eventos.id"), nullable=False)
     codigo_certificado = Column(String(100), unique=True, nullable=False)
     emitido_em = Column(DateTime, default=datetime.datetime.utcnow)
-    caminho_pdf = Column(String(500), nullable=True)  # caminho/URL do pdf armazenado
+    caminho_pdf = Column(String(500), nullable=True)
     revogado = Column(Boolean, default=False)
