@@ -149,6 +149,11 @@ class CheckinView(ctk.CTkFrame):
             self._show_participante_nao_encontrado(cpf)
             return
         
+        print(inscrito.get("status"))
+        if inscrito.get("status") == "cancelada":
+            self._show_inscricao_cancelada(inscrito)
+            return
+        
         # Verifica check-in
         checkin_status = self.checkin_service.verificar_checkin_existente(inscrito['inscricao_id'])
         
@@ -298,6 +303,44 @@ COMO PROCEDER?
         self._update_info(info)
         self.checkin_btn.configure(state="disabled")
     
+    def _show_inscricao_cancelada(self, inscrito: dict):
+        """Exibe mensagem quando inscrição está cancelada"""
+        self.found_inscricao = None
+    
+        info = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ INSCRIÇÃO CANCELADA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nome: {inscrito['nome']}
+CPF: {inscrito['cpf']}
+Email: {inscrito['email']}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ ESTA INSCRIÇÃO FOI CANCELADA
+
+→ A pessoa não pode fazer check-in
+→ Verifique se houve algum erro
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+O QUE FAZER?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Se a pessoa deseja participar:
+
+1. Ela precisa fazer uma NOVA 
+   inscrição pelo site
+
+   OU
+
+2. Use "Inscrição Rápida + Check-in"
+   para criar um cadastro temporário
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+    
+        self._update_info(info)
+        self.checkin_btn.configure(state="disabled")
+
     def _show_checkin_ja_existe(self, inscrito: dict, sincronizado: bool):
         """Exibe mensagem quando check-in já existe"""
         self.found_inscricao = None

@@ -8,16 +8,16 @@ class InscritoRepository(BaseRepository):
         super().__init__("inscritos")
     
     def create(self, inscricao_id: str, evento_id: str, nome: str, 
-               cpf: str, email: str, sincronizado: int = 0) -> str:
+               cpf: str, email: str, sincronizado: int = 0, status: str = "ativa") -> str:
         """Cria novo inscrito"""
         query = """
             INSERT OR REPLACE INTO inscritos 
-            (inscricao_id, evento_id, nome, cpf, email, sincronizado, criado_em)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (inscricao_id, evento_id, nome, cpf, email, sincronizado, status, criado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
         self._execute(
             query,
-            (inscricao_id, evento_id, nome, cpf, email, sincronizado, 
+            (inscricao_id, evento_id, nome, cpf, email, sincronizado, status,
              datetime.utcnow().isoformat())
         )
         print(f"[REPO] Inscrito salvo: {nome} (CPF: {cpf})")
@@ -26,7 +26,7 @@ class InscritoRepository(BaseRepository):
     def find_by_id(self, inscricao_id: str) -> Optional[Dict]:
         """Busca inscrito por ID"""
         query = """
-            SELECT inscricao_id, evento_id, nome, cpf, email, sincronizado 
+            SELECT inscricao_id, evento_id, nome, cpf, email, sincronizado, status
             FROM inscritos 
             WHERE inscricao_id = ?
         """
@@ -41,7 +41,7 @@ class InscritoRepository(BaseRepository):
         """Busca inscrito por CPF, opcionalmente filtrando por evento"""
         if evento_id:
             query = """
-                SELECT inscricao_id, evento_id, nome, cpf, email, sincronizado 
+                SELECT inscricao_id, evento_id, nome, cpf, email, sincronizado, status
                 FROM inscritos 
                 WHERE cpf = ? AND evento_id = ?
             """
@@ -62,7 +62,7 @@ class InscritoRepository(BaseRepository):
     def find_by_evento(self, evento_id: str) -> List[Dict]:
         """Lista todos os inscritos de um evento"""
         query = """
-            SELECT inscricao_id, evento_id, nome, cpf, email, sincronizado 
+            SELECT inscricao_id, evento_id, nome, cpf, email, sincronizado, status
             FROM inscritos 
             WHERE evento_id = ?
         """
@@ -96,5 +96,6 @@ class InscritoRepository(BaseRepository):
             "nome": row[2],
             "cpf": row[3],
             "email": row[4],
-            "sincronizado": row[5]
+            "sincronizado": row[5],
+            "status": row[6]
         }
