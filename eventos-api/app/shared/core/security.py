@@ -6,13 +6,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Importar após load_dotenv
 from app.shared.core.config import settings
 from app.shared.core.database import get_db
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
-API_KEY = os.getenv("API_KEY", "sua_api_key_aqui")
+API_KEY = os.getenv("API_KEY")
 
 
 def verificar_token_middleware(authorization: str = Header(...)):
