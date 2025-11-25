@@ -23,11 +23,6 @@ def hash_password(password: str):
     return pwd_context.hash(password.strip())
 
 
-@app.get("/")
-def health_check():
-    return {"service": "usuarios-service", "status": "running"}
-
-
 @app.post("/", response_model=schemas.UsuarioOut, status_code=status.HTTP_201_CREATED)
 def criar_usuario(
     u: schemas.UsuarioCreate,

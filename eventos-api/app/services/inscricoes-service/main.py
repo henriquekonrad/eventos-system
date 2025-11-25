@@ -182,8 +182,6 @@ def cancelar_inscricao(
 ):
     """
     Cancela uma inscrição existente.
-    
-    REQUER: API Key + JWT + Role (administrador OU atendente)
     """
     inscr = db.query(Inscricao).filter(Inscricao.id == inscricao_id).first()
     if not inscr:

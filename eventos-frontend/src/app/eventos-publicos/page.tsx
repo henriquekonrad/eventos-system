@@ -136,10 +136,6 @@ export default async function EventosPublicosPage() {
                             d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                           />
                         </svg>
-                        <div>
-                          <p className="font-medium text-gray-700">Local</p>
-                          <p>{evento.local}</p>
-                        </div>
                       </div>
                     </div>
 
