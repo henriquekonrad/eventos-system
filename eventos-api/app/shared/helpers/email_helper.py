@@ -11,63 +11,6 @@ EMAIL_API_KEY = os.getenv("EMAIL_API_KEY", "")
 TemplateType = Literal["inscricao", "cancelamento", "checkin"]
 
 
-async def enviar_email(
-    to: str,
-    template: TemplateType,
-    data: Dict[str, Any]
-) -> bool:
-    """
-    Envia email usando o serviço de email em node
-    """
-    
-    subjects = {
-        "inscricao": "Inscrição confirmada",
-        "cancelamento": "Inscrição cancelada", 
-        "checkin": "Presença registrada"
-    }
-    
-    subject = subjects.get(template, "Notificação")
-    
-    payload = {
-        "to": to,
-        "subject": subject,
-        "template": template,
-        "data": data
-    }
-    
-    headers = {
-        "x-api-key": EMAIL_API_KEY,
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{EMAIL_SERVICE_URL}/email/send",
-                json=payload,
-                headers=headers,
-                timeout=10.0
-            )
-            
-            if response.status_code == 200:
-                logger.info(f"Email enviado com sucesso para {to} (template: {template})")
-                return True
-            else:
-                logger.error(
-                    f"Falha ao enviar email para {to}. "
-                    f"Status: {response.status_code}, "
-                    f"Response: {response.text}"
-                )
-                return False
-                
-    except httpx.TimeoutException:
-        logger.error(f"Timeout ao enviar email para {to}")
-        return False
-    except Exception as e:
-        logger.error(f"Erro ao enviar email para {to}: {str(e)}")
-        return False
-
-
 def enviar_email_sync(
     to: str,
     template: TemplateType,
@@ -75,7 +18,6 @@ def enviar_email_sync(
 ) -> bool:
     """
     Versão síncrona do envio de email.
-    Útil para contextos não-assíncronos.
     """
     
     subjects = {
